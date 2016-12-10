@@ -159,7 +159,7 @@ class band:
 				_f_shp = fzip.generate_file('', '.shp')
 				_cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, f)
 
-				import run_commands
+				from gio import run_commands
 				run_commands.run(_cmd)
 			else:
 				_f_shp = f
@@ -197,7 +197,7 @@ class band:
 		return _cs
 
 	def _save(self, bnd, cs, f):
-		import mod_image
+		from geo_map_util import mod_image
 		_dat = mod_image.convert(bnd, cs)
 
 		import png
@@ -318,7 +318,7 @@ class band:
 
 			from gio import config
 			if config.cfg.getboolean('conf', 'mmu'):
-				import filter_band
+				from geo_map_util import filter_band
 				_bnd = filter_band.mmu(_bnd, 1, 1)
 
 			return [_bnd]

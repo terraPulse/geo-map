@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 '''
@@ -16,26 +17,23 @@ def handle_error(request, response, exception):
 			'status': 'error',
 			'status_code': exception.code,
 			'error_message': exception.explanation,
-		}
+			}
 
 	response.write(json.dumps(result))
 	response.set_status(exception.code)
 
 def main(opts):
-	# import serv_web
-	# serv_web._zips = serv_web.load_zips()
-
 	_routes = [
-		(r'/_(.+)', 'serv_op.op'),
-		(r'/map/(.+)', 'serv_web.map_obj'),
-		# (r'/web/(.+)', 'serv_web.web'),
-		(r'/?([^_].*)', 'serv_test.test'),
-	]
+			(r'/_(.+)', 'geo_map_serv.serv_op.op'),
+			(r'/map/(.+)', 'geo_map_serv.serv_web.map_obj'),
+			# (r'/web/(.+)', 'serv_web.web'),
+			(r'/?([^_].*)', 'geo_map_serv.serv_test.test'),
+			]
 
 	_config = {}
 	_config['webapp2_extras.sessions'] = {
-		'secret_key': 'something-very-secret'
-	}
+			'secret_key': 'something-very-secret'
+			}
 
 	import webapp2
 

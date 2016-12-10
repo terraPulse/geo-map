@@ -188,8 +188,8 @@ class map_obj(serv_base.service_base):
 			_f = self._format_path(os.path.join(_d_web, path))
 
 			if not os.path.exists(_f):
-				if self.pp('cache') == '1':
-					self._dmap_mag_single(path, _f)
+				# if self.pp('cache') == '1':
+				self._dmap_mag_single(path, _f)
 
 				# _f = config.get_at('general', 'nodata_file')
 
