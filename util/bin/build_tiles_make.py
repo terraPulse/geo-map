@@ -13,7 +13,7 @@ import logging
 
 def load_shp(f):
 	from osgeo import ogr
-	import geo_base_c as gb
+	from gio import geo_base as gb
 
 	_shp = ogr.Open(f)
 	if _shp == None:
@@ -33,14 +33,14 @@ def load_shp(f):
 		else:
 			_area = _area.union(_ext)
 
-	import geo_raster_c as ge
+	from gio import geo_raster as ge
 	_prj = ge.proj_from_epsg(3857)
 
 	_reg = _area.to_polygon().segment_ratio(30).project_to(_prj)
 	return _reg.extent()
 
 def load_img(f, fzip):
-	import geo_raster_c as ge
+	from gio import geo_raster as ge
 
 	_prj = ge.proj_from_epsg(3857)
 	_reg = ge.open(fzip.unzip(f)).extent().to_polygon().segment_ratio(30).project_to(_prj)
@@ -62,7 +62,7 @@ class color_table:
 		if _ext == '.shp':
 			_f = color_table.load_sample(f)
 
-		import geo_raster_c as ge
+		from gio import geo_raster as ge
 		_b = ge.open(fzip.unzip(_f)).get_band()
 
 		if _b.color_table == None:
@@ -119,7 +119,7 @@ class tiles:
 
 	def __init__(self):
 		import math
-		import geo_raster_c as ge
+		from gio import geo_raster as ge
 
 		self.b = 6378137.0
 		self.s = 256
@@ -128,7 +128,7 @@ class tiles:
 		self.prj = ge.proj_from_epsg(3857)
 
 	def list(self, level, ext=None):
-		import geo_base_c as gb
+		from gio import geo_base as gb
 
 		_r = (2 * self.p) / (2 ** level)
 
@@ -160,12 +160,11 @@ class tiles:
 
 		_geo = [_x, _c, 0, _y + _r, 0, -_c]
 
-		import geo_raster_c as ge
+		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
 def make(f_inp, f_clr, levels, percent, d_out, fzip):
 	import os
-	import config
 
 	# detect the extent of input file
 	_ext = load_shp(f_inp) if f_inp.endswith('.shp') else load_img(f_inp, fzip)
@@ -195,45 +194,37 @@ def make(f_inp, f_clr, levels, percent, d_out, fzip):
 	logging.info('found %s task' % len(_ps))
 	print 'found %s tasks' % len(_ps)
 
-	print 'write map.html'
-	import geo_raster_c as ge
-	_ext_geo = _ext.to_polygon().segment_ratio(30).project_to(ge.proj_from_epsg()).extent()
+	# print 'write map.html'
+	# from gio import geo_raster as ge
+	# _ext_geo = _ext.to_polygon().segment_ratio(30).project_to(ge.proj_from_epsg()).extent()
 
-	_f_out = os.path.join(d_out, 'map.html')
-	with open(config.cfg.get('conf', 'openlayers_temp'), 'r') as _fi, open(_f_out, 'w') as _fo:
-		_fo.write(_fi.read() % {
-				'title': os.path.basename(f_inp),
-				'xmin': _ext_geo.minx, 'xmax': _ext_geo.maxx,
-				'ymin': _ext_geo.miny, 'ymax': _ext_geo.maxy,
-				'zmin': levels[0], 'zmax': levels[1]
-				})
+	# _f_out = os.path.join(d_out, 'map.html')
+	# with open(config.cfg.get('conf', 'openlayers_temp'), 'r') as _fi, open(_f_out, 'w') as _fo:
+	# 	_fo.write(_fi.read() % {
+	# 			'title': os.path.basename(f_inp),
+	# 			'xmin': _ext_geo.minx, 'xmax': _ext_geo.maxx,
+	# 			'ymin': _ext_geo.miny, 'ymax': _ext_geo.maxy,
+	# 			'zmin': levels[0], 'zmax': levels[1]
+	# 			})
 
 	with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
 		import pickle
 		pickle.dump(_ps, _fo)
 
-def main():
-	_opts = _init_env()
-
+def main(opts):
 	from osgeo import gdal
 	gdal.UseExceptions()
 
 	import os
-
-	_d_out = _opts.output
+	_d_out = opts.output
 	os.path.exists(_d_out) or os.makedirs(_d_out)
 
-	import file_unzip
+	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
-		make(_opts.input, _opts.color, _opts.levels, _opts.percent, _opts.output, _zip)
+		make(opts.input, opts.color, opts.levels, opts.percent, opts.output, _zip)
 
-def _usage():
-	import argparse
-
-	_p = argparse.ArgumentParser()
-	_p.add_argument('--logging', dest='logging')
-	_p.add_argument('--config', dest='config')
-	_p.add_argument('--temp', dest='temp')
+def usage():
+	_p = environ_mag.usage(False)
 
 	_p.add_argument('-i', '--input', dest='input', required=True)
 	_p.add_argument('-o', '--output', dest='output', required=True)
@@ -242,37 +233,10 @@ def _usage():
 	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
 	_p.add_argument('-l', '--levels', dest='levels', default=[5, 10], nargs=2, type=int)
 
-	return _p.parse_args()
-
-def _init_env():
-	import os, sys
-
-	_dirs = ['lib', 'libs']
-	_d_ins = [os.path.join(sys.path[0], _d) for _d in _dirs if \
-			os.path.exists(os.path.join(sys.path[0], _d))]
-	sys.path = [sys.path[0]] + _d_ins + sys.path[1:]
-
-	_opts = _usage()
-
-	import logging_util
-	logging_util.init(_opts.logging)
-
-	import config
-	config.load(_opts.config)
-
-	if not config.cfg.has_section('conf'):
-		config.cfg.add_section('conf')
-
-	for _k, _v in _opts.__dict__.items():
-		if _v != None:
-			config.cfg.set('conf', _k, str(_v))
-
-
-	import file_unzip as fz
-	fz.clean(fz.default_dir(_opts.temp))
-
-	return _opts
+	return _p
 
 if __name__ == '__main__':
-	main()
+	from gio import environ_mag
+	environ_mag.init_path()
+	environ_mag.run(main, [environ_mag.config(usage())])
 

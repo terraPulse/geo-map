@@ -159,7 +159,7 @@ class band:
 				_f_shp = fzip.generate_file('', '.shp')
 				_cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, f)
 
-				import run_commands
+				from gio import run_commands
 				run_commands.run(_cmd)
 			else:
 				_f_shp = f

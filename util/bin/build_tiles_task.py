@@ -10,7 +10,7 @@ Description:
 '''
 
 def _make_tile(f, lev, num, col, row, pec, clr, out):
-	import map_tile
+	from geo_map_util import map_tile
 	map_tile.make_tile(f, lev, col, row, pec, clr, out)
 
 def main(opts):
@@ -20,7 +20,7 @@ def main(opts):
 	with open(os.path.join(opts.input, 'tasks.txt'), 'rb') as _fi:
 		_ps = pickle.load(_fi)
 
-	import multi_task
+	from gio import multi_task
 	_tt = multi_task.load(_ps, opts)
 	print '%s tasks' % len(_tt)
 
