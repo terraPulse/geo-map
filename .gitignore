@@ -15,14 +15,19 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+libs/
 lib64/
 parts/
 sdist/
 var/
+tmp/
+log/
 *.egg-info/
 .installed.cfg
 *.egg
+*.log
+*.c
+*.bak
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
