@@ -16,7 +16,7 @@ def load_shp(f):
 	from gio import geo_base as gb
 
 	_shp = ogr.Open(f)
-	if _shp == None:
+	if _shp is None:
 		raise Exception('Failed to load shapefile ' + f)
 
 	_lyr = _shp.GetLayer()
@@ -28,7 +28,7 @@ def load_shp(f):
 		_ext = _obj.extent()
 
 		_objs.append(_obj)
-		if _area == None:
+		if _area is None:
 			_area = _ext
 		else:
 			_area = _area.union(_ext)
@@ -65,14 +65,14 @@ class color_table:
 		from gio import geo_raster as ge
 		_b = ge.open(fzip.unzip(_f)).get_band()
 
-		if _b.color_table == None:
+		if _b.color_table is None:
 			return None
 		else:
 			return color_table(_b.color_table)
 
 	def _color_table(self, c):
 		_cs = {}
-		if c == None:
+		if c is None:
 			return None
 
 		_rg = lambda x: min(max(0, x), 255)
@@ -106,7 +106,7 @@ class color_table:
 		from osgeo import ogr
 
 		_shp = ogr.Open(f)
-		if _shp == None:
+		if _shp is None:
 			raise Exception('Failed to load shapefile ' + f)
 
 		_lyr = _shp.GetLayer()
@@ -144,7 +144,7 @@ class tiles:
 				_y = -self.p + (_row * _r)
 
 				_ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
-				if ext == None or _ext.is_intersect(ext):
+				if ext is None or _ext.is_intersect(ext):
 					yield level, _num, _col, _row
 
 	def cell(self, level):
@@ -215,21 +215,24 @@ def main(opts):
 	from osgeo import gdal
 	gdal.UseExceptions()
 
+	from gio import config
+
 	import os
-	_d_out = opts.output
+	_d_out = os.path.join(config.get('conf', 'output'), opts.tag)
 	os.path.exists(_d_out) or os.makedirs(_d_out)
 
 	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
-		make(opts.input, opts.color, opts.levels, opts.percent, opts.output, _zip)
+		make(config.get('conf', 'input'), config.get('conf', 'color'), \
+				opts.levels, opts.percent, config.get('conf', 'output'), _zip)
 
 def usage():
 	_p = environ_mag.usage(False)
 
 	_p.add_argument('-i', '--input', dest='input', required=True)
-	_p.add_argument('-o', '--output', dest='output', required=True)
+	_p.add_argument('-o', '--output', dest='output')
 	_p.add_argument('-c', '--color', dest='color')
-			# default='/data/glcf-st-004/data/workspace/fengm/prog/fcc_1975/v2/conf/colors/colors_dat.txt')
+	_p.add_argument('-t', '--tag', dest='tag', required=True)
 	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
 	_p.add_argument('-l', '--levels', dest='levels', default=[5, 10], nargs=2, type=int)
 

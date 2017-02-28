@@ -68,7 +68,7 @@ class op(serv_base.service_base):
 			_user = self.pp('user_name')
 			_pass = self.pp('password')
 
-			if _user == 'global' and _pass == 'global':
+			if _user == 'crop' and _pass == '6grain_map':
 				self.output_json({'user_name': _user, 'real_name': 'Test'})
 			else:
 				raise Exception('authorization failed')

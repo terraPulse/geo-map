@@ -76,7 +76,7 @@ def make_tile(f, lev, col, row, percent, f_clr, d_out):
 		from gio import geo_base as gb
 		_eee = _ext.extent().to_polygon().project_to(gb.modis_projection()).extent()
 
-		logging.info('generate tile %s' % _f)
+		logging.debug('generate tile %s' % _f)
 		if percent != None:
 			band(f, lev, _eee, _zip).make_perc(_ext, percent, f_clr, _f)
 		else:
@@ -249,13 +249,13 @@ class band:
 
 	def _load_color_table(self, f_clr):
 		if f_clr:
-			logging.info('use color table %r' % f_clr)
+			logging.debug('use color table %r' % f_clr)
 			return self._load_color(f_clr)
 
 		if self.color == None:
 			raise Exception('no color table provided')
 
-		logging.info('use internal color table')
+		logging.debug('use internal color table')
 		return self._color(self.color)
 
 	def _scale_band(self, bnd, div):

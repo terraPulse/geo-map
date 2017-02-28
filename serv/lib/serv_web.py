@@ -15,8 +15,12 @@ class web(serv_base.service_base):
 		import os
 		from gio import config
 
+		_path = path
+		if _path == '' or _path == '/':
+			_path  = 'index.html'
+
 		_d_web = config.get_at('general', 'web_path')
-		_f_res = os.path.join(_d_web, path)
+		_f_res = os.path.join(_d_web, _path)
 
 		if os.path.exists(_f_res):
 			logging.info('loading web path: ' + path)
@@ -152,7 +156,7 @@ class map_obj(serv_base.service_base):
         #
 		# _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
-		import map_tile
+		from geo_map_util import map_tile
 		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _clr, _out)
 		logging.info('generated tile %s' % f_inp)
 
@@ -179,11 +183,15 @@ class map_obj(serv_base.service_base):
 		import os
 		from gio import config
 
-		_p, _v = path.split('/', 1)
+		print '*%s*' % path
 
+		if not path:
+			path = '/'
+
+		_p, _v = path.split('/', 1) if '/' in path else ('', path)
 		_d_web = config.get_at('general', 'map_path')
 
-		if os.path.exists(os.path.join(_d_web, _p)):
+		if os.path.exists(os.path.join(_d_web, _p) if _p else _d_web):
 			logging.info('loading web path: ' + path)
 			_f = self._format_path(os.path.join(_d_web, path))
 
