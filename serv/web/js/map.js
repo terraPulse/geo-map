@@ -158,11 +158,23 @@ function init(){
 
 	// map.addLayer(create_layer('/map/hungary_01', 'Hungary v0.01'));
 	map.addLayer(create_layer('/map/hungary_02', 'Hungary v0.2'));
-	map.addLayer(create_json_layer('/map/tiles_hungary.json', 'Hungary tiles'));
+	// map.addLayer(create_json_layer('/map/tiles_hungary.json', 'Hungary tiles'));
 
 	map.addLayer(create_layer('/map/south_africa_wheat01', 'South Africa v1.0'));
 	map.addLayer(create_layer('/map/south_africa_wheat02', 'South Africa v2.0'));
-	map.addLayer(create_layer('/map/zimbabwe_s2_crop02', 'Zimbabwi v0.9'));
+	map.addLayer(create_layer('/map/zimbabwe_s2_crop02', 'Zimbabwi v0.2'));
+	map.addLayer(create_layer('/map/zimbabwe_s2_merge', 'Zimbabwi v0.2 (cmb)'));
+	map.addLayer(create_layer('/map/zimbabwe_s2_crop04', 'Zimbabwi v0.4'));
+	map.addLayer(create_layer('/map/zimbabwe_s2_crop04_comb', 'Zimbabwi v0.4 (cmb)'));
+	// map.addLayer(create_layer('/map/malawi_maize_01', 'Malawi v0.1'));
+	// map.addLayer(create_layer('/map/malawi_s2_a_01', 'Malawi v0.20'));
+	// map.addLayer(create_layer('/map/malawi_maize_01_cmb', 'Malawi v0.25 (cmb)'));
+	map.addLayer(create_layer('/map/q1_s2_v02', 'Q1 season2 v0.2'));
+	map.addLayer(create_layer('/map/malawi_s2_b_01', 'Malawi v0.25'));
+	// **map**
+
+
+	// map.addLayer(create_layer('/map/zimbabwi_s2_04', 'Zimbabwi v0.4'));
 
 
 	var switcherControl = new OpenLayers.Control.LayerSwitcher();

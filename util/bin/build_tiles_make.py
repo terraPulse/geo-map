@@ -163,7 +163,7 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make(f_inp, f_clr, levels, percent, d_out, fzip):
+def make(f_inp, f_clr, levels, title, percent, d_out, fzip):
 	import os
 
 	# detect the extent of input file
@@ -207,9 +207,21 @@ def make(f_inp, f_clr, levels, percent, d_out, fzip):
 	# 			'zmin': levels[0], 'zmax': levels[1]
 	# 			})
 
+	print 'write to', os.path.join(d_out, 'tasks.txt')
 	with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
 		import pickle
 		pickle.dump(_ps, _fo)
+
+	from gio import obj
+	_obj = obj.obj()
+
+	_obj.file = f_inp
+	if percent is not None:
+		_obj.percent = percent
+	if title:
+		_obj.title = title
+
+	_obj.save(os.path.join(d_out, 'setting.ini'))
 
 def main(opts):
 	from osgeo import gdal
@@ -224,7 +236,7 @@ def main(opts):
 	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
 		make(config.get('conf', 'input'), config.get('conf', 'color'), \
-				opts.levels, opts.percent, config.get('conf', 'output'), _zip)
+				opts.levels, opts.title, opts.percent, _d_out, _zip)
 
 def usage():
 	_p = environ_mag.usage(False)
@@ -233,8 +245,9 @@ def usage():
 	_p.add_argument('-o', '--output', dest='output')
 	_p.add_argument('-c', '--color', dest='color')
 	_p.add_argument('-t', '--tag', dest='tag', required=True)
+	_p.add_argument('--title', dest='title')
 	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
-	_p.add_argument('-l', '--levels', dest='levels', default=[5, 10], nargs=2, type=int)
+	_p.add_argument('-l', '--levels', dest='levels', default=[5, 11], nargs=2, type=int)
 
 	return _p
 

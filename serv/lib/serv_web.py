@@ -11,9 +11,38 @@ class web(serv_base.service_base):
 	def __init__(self, request, response):
 		serv_base.service_base.__init__(self, request, response)
 
+	def _add_maps(self, f, fzip):
+		from gio import config
+		from gio import obj
+		import os
+
+		_d_map = config.get('general', 'map_path')
+		_fs = []
+		for _d in sorted(os.listdir(_d_map)):
+			_f = os.path.join(_d_map, _d, 'setting.ini')
+			if os.path.exists(_f):
+				_obj = obj.load(_f)
+
+				_tit = _obj.get('title', _d)
+				_lin = '\tmap.addLayer(create_layer(\'/map/%s\', \'%s\'));' % (_d, _tit)
+				_fs.append(_lin)
+
+				logging.info('add layer %s: %s' % (_tit, _d))
+
+		if len(_fs) == 0:
+			return f
+		else:
+			_f = fzip.generate_file('', '.js')
+			_p = '// **map**'
+			with open(_f, 'w') as _fo, open(f, 'r') as _fi:
+				_fo.write(_fi.read().replace(_p, '\n'.join(_fs + ['\t' + _p])))
+
+			return _f
+
 	def task(self, path):
 		import os
 		from gio import config
+		from gio import file_unzip
 
 		_path = path
 		if _path == '' or _path == '/':
@@ -22,11 +51,14 @@ class web(serv_base.service_base):
 		_d_web = config.get_at('general', 'web_path')
 		_f_res = os.path.join(_d_web, _path)
 
-		if os.path.exists(_f_res):
-			logging.info('loading web path: ' + path)
-			return self.output_file(_f_res)
+		if not os.path.exists(_f_res):
+			raise Exception('no file found %s' % _f_res)
 
-		raise Exception('no file found %s' % _f_res)
+		logging.info('loading web path: ' + path)
+		if _f_res.endswith('js/map.js'):
+			with file_unzip.file_unzip() as _zip:
+				return self.output_file(self._add_maps(_f_res, _zip))
+		return self.output_file(_f_res)
 
 _zips = {}
 
@@ -129,6 +161,9 @@ class map_obj(serv_base.service_base):
 		import os
 		import re
 
+		if os.path.exists(f_out):
+			return
+
 		_m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f_inp)
 
 		_tag = _m.group(1)
@@ -136,20 +171,25 @@ class map_obj(serv_base.service_base):
 		_col = int(_m.group(3))
 		_row = int(_m.group(4))
 
-		if not config.cfg.has_section(_tag):
+		_out = os.path.join(config.get('general', 'map_path'), _tag)
+		_inp = None
+
+		if config.cfg.has_section(_tag):
+			_inp = config.get(_tag, 'file', '')
+			_pec = config.getint(_tag, 'percent', None)
+			_clr = config.get(_tag, 'color', None)
+		else:
+			_f_ini = os.path.join(_out, 'setting.ini')
+			if os.path.exists(_f_ini):
+				from gio import obj
+				_met = obj.load(_f_ini)
+
+				_inp = _met.get('file')
+				_pec = _met.getint('percent')
+				_clr = _met.get('color')
+
+		if _inp is None:
 			return
-
-		_inp = config.get(_tag, 'file', '')
-		if not _inp:
-			return
-
-		if os.path.exists(f_out):
-			return
-
-		_pec = config.getint(_tag, 'percent', None)
-		_clr = config.get(_tag, 'color', None)
-
-		_out = os.path.join(config.get('conf', 'output'), _tag)
 
 		if _clr is None:
 			_clr = os.path.join(_out, 'color.txt')
@@ -182,8 +222,6 @@ class map_obj(serv_base.service_base):
 	def task(self, path):
 		import os
 		from gio import config
-
-		print '*%s*' % path
 
 		if not path:
 			path = '/'
