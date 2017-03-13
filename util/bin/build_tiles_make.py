@@ -230,12 +230,12 @@ def main(opts):
 	from gio import config
 
 	import os
-	_d_out = os.path.join(config.get('conf', 'output'), opts.tag)
+	_d_out = os.path.abspath(os.path.join(config.get('conf', 'output'), opts.tag))
 	os.path.exists(_d_out) or os.makedirs(_d_out)
 
 	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
-		make(config.get('conf', 'input'), config.get('conf', 'color'), \
+		make(os.path.abspath(config.get('conf', 'input')), config.get('conf', 'color'), \
 				opts.levels, opts.title, opts.percent, _d_out, _zip)
 
 def usage():
