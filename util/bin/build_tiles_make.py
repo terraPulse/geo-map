@@ -220,6 +220,7 @@ def make(f_inp, f_clr, levels, title, percent, d_out, fzip):
 		_obj.percent = percent
 	if title:
 		_obj.title = title
+	_obj.visible = True
 
 	_obj.save(os.path.join(d_out, 'setting.ini'))
 

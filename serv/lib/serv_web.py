@@ -23,6 +23,9 @@ class web(serv_base.service_base):
 			if os.path.exists(_f):
 				_obj = obj.load(_f)
 
+				if _obj.get('visible', True) == False:
+					continue
+
 				_tit = _obj.get('title', _d)
 				_lin = '\tmap.addLayer(create_layer(\'/map/%s\', \'%s\'));' % (_d, _tit)
 				_fs.append(_lin)
