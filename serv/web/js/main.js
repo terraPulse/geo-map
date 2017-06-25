@@ -69,8 +69,9 @@ function load_image(img, url){
 		});
 }
 
-$(document).ready(function(){
 
+function init_controls(){
+	/*
 	$('#dlg_ndvi').dialog({
 		autoOpen: false,
 		width: 750,
@@ -92,6 +93,16 @@ $(document).ready(function(){
 		}
 	});
 
+	$("#btn_ndvi" ).button().click(function(e){
+		if(this.checked){
+			map_ctrls['ndvi'].activate();
+		}
+		else{
+			map_ctrls['ndvi'].deactivate();
+		}
+	});
+	*/
+
 	$("#btn_wrs_pixel" ).button().click(function(e){
 		if(this.checked){
 			map_ctrls['pixel'].activate();
@@ -101,14 +112,35 @@ $(document).ready(function(){
 		}
 	});
 
-	$("#btn_ndvi" ).button().click(function(e){
-		if(this.checked){
-			map_ctrls['ndvi'].activate();
-		}
-		else{
-			map_ctrls['ndvi'].deactivate();
-		}
-	});
+	$('#dlg_goto_location').dialog({
+		autoOpen: false,
+		width: 350,
+		modal: false,
+		resizable: false,
+		buttons: {
+			"Zoom To": function(e) {
+				var _x = $('#val_goto_location_x').val();
+				var _y = $('#val_goto_location_y').val();
 
-	init();
+				if(!($.isNumeric(_x) && $.isNumeric(_y))){
+					alert_win('Please input numberic values')
+					return;
+				}
+
+				map.put_point(parseFloat(_x), parseFloat(_y), true);
+				$(this).dialog("close");
+			},
+			"Close": function() {
+				$(this).dialog("close");
+			}
+		}});
+
+	$('#btn_goto_location').click(function(){
+		$('#dlg_goto_location').dialog('open');
+	});
+}
+
+$(document).ready(function(){
+	init_controls();
+	init_map();
 }); 

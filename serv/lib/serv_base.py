@@ -52,8 +52,8 @@ class service_base(webapp2.RequestHandler):
 		_type = 'inline' if (not attachment) else 'attachment'
 		self.response.headers['Content-Disposition'] = '%s; filename=%s' % (_type, os.path.basename(f))
 
-		logging.info('context-type:' + _context)
-		logging.info('loading web file: ' + f)
+		logging.info('context-type: %s' % _context)
+		logging.info('loading web file: %s' % f)
 
 		self.response.out.write(b)
 
