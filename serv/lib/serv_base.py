@@ -47,6 +47,9 @@ class service_base(webapp2.RequestHandler):
 		import os
 
 		_context = mimetypes.guess_type(f)[0]
+		if _context is None:
+			_context = 'application/octet-stream'
+
 		self.response.headers['Content-Type'] = _context
 		# _type = 'inline' if 'image' in _context else 'attachment'
 		_type = 'inline' if (not attachment) else 'attachment'

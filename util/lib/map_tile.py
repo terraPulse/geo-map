@@ -53,9 +53,9 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make_tile(f, lev, col, row, percent, f_clr, d_out):
-	from osgeo import gdal
-	gdal.UseExceptions()
+def make_tile(f, lev, col, row, percent, f_clr, d_out, agg=None):
+	# from osgeo import gdal
+	# gdal.UseExceptions()
 
 	from gio import file_unzip
 	import os
@@ -78,9 +78,9 @@ def make_tile(f, lev, col, row, percent, f_clr, d_out):
 
 		logging.debug('generate tile %s' % _f)
 		if percent != None:
-			band(f, lev, _eee, _zip).make_perc(_ext, percent, f_clr, _f)
+			band(f, lev, _eee, _zip).make_perc(_ext, percent, f_clr, _f, agg=agg)
 		else:
-			band(f, lev, _eee, _zip).make(_ext, f_clr, _f)
+			band(f, lev, _eee, _zip).make(_ext, f_clr, _f, agg=agg)
 
 class color_table:
 
@@ -165,7 +165,7 @@ class band:
 				_f_shp = f
 
 			from gio import geo_raster_ex as gx
-			_bnd = gx.geo_band_stack_zip.from_shapefile(_f_shp, file_unzip=fzip)
+			_bnd = gx.geo_band_stack_zip.from_shapefile(_f_shp, file_unzip=fzip, )
 			if _bnd is not None:
 				self.bnd = [_bnd]
 		else:
@@ -221,27 +221,29 @@ class band:
 
 		return _cs
 
-	def _interp_colors(self, cs, v_val, scale=100):
+	def _interp_colors(self, cs, v_val, scale=100, max_val=100):
 		if cs == None or len(cs.keys()) == 0:
 			raise Exception('no color table provided')
 
 		_c2 = cs[v_val]
 		# _c1 = [255, 255, 255, 0] #cs[v_non]
 		# _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
-		_c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
+		# _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
+		_c1 = [255, 255, 255]
 
 		if len(_c1) > 3:
 			_c1 = _c1[:3]
 
-		_c1 = _c1 + [30]
+		_c1 = _c1 + [255]
 
-		_ss = [(_c2[i] - _c1[i]) / float(scale) for i in xrange(len(_c1))]
-		_cs = {0: [255, 255, 255, 0]}
+		_ss = [(_c2[i] - _c1[i]) / float(max_val) for i in xrange(len(_c1))]
+		_cs = {0: [255, 255, 255, 255]}
 
 		for i in xrange(scale):
-			_cs[i + 1] = [int(_c1[_b] + (i * _ss[_b]))  for _b in xrange(len(_c1))]
+			# _cs[i + 1] = [int(_c1[_b] + (min(i, max_val) * _ss[_b]))  for _b in xrange(len(_c1))]
+			_cs[i + 1] = map(lambda x: max(0, min(255, x)), [int(_c1[_b] + i * _ss[_b])  for _b in xrange(len(_c1))])
 			if len(_cs[i+1]) > 3:
-				_cs[i+1][-1] = max(_cs[i+1][-1], 30)
+				_cs[i+1][-1] = max(_cs[i+1][-1], 50)
 
 			# print i, _cs[i]
 
@@ -269,7 +271,7 @@ class band:
 				int(math.ceil(bnd.height * float(div))),
 				bnd.proj)
 
-	def _load_data(self, bnd_inp, bnd_out, zoom, perc=None):
+	def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, agg=None):
 		from gio import config
 		from gio import agg_band
 
@@ -293,25 +295,34 @@ class band:
 
 			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc)
 
-		_agg = config.cfg.get('conf', 'aggregate').strip()
-
-		if _agg in ['', 'none'] or zoom <= 2:
+		if zoom <= 2:
 			return self.bnd[0].read_block(bnd_out)
 
-		if _agg == 'dominated':
+		_agg = agg or config.cfg.get('conf', 'aggregate').strip()
+
+		if _agg in [None, '', 'none', 'dominated']:
 			return agg_band.dominated(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, False)
 
 		if _agg == 'mean':
-			return agg_band.mean(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, 0, 100)
+			_bnd_inp = bnd_inp.read_block(bnd_out.scale(zoom))
+			_bnd = agg_band.mean(_bnd_inp, bnd_out, 0, 100)
+			_bnd.data[_bnd.data > 100] = _bnd.nodata
+
+			# add water pixels
+			# _bnd_inp.data[_bnd_inp.data <= 100] = 0
+			# _msk = agg_band.dominated(_bnd_inp, bnd_out, False)
+			# _bnd.data[_msk.data == 200] = 200
+
+			return _bnd
 
 		raise Exception('unknown aggregate option: %s' % _agg)
 		import sys
 		sys.exit(0)
 
-	def _load_band(self, bnd, perc=None):
+	def _load_band(self, bnd, perc=None, agg=None):
 		if len(self.bnd) == 1:
-			_zoom = min(int(bnd.geo_transform[1] / (self.bnd[0].cell_size * 3)), 5)
-			_bnd = self._load_data(self.bnd[0], bnd, _zoom, perc)
+			_zoom = min(int(bnd.geo_transform[1] / (self.bnd[0].cell_size * 3)), 10)
+			_bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, agg)
 			# if perc != None:
 			# 	_idx = (_bnd.data > 0) & (_bnd.data < 10)
 			# 	_bnd.data[_idx] = 10
@@ -346,19 +357,23 @@ class band:
 
 			_img.flush()
 
-	def make(self, bnd, f_clr, f_out):
-		_bnd = self._load_band(bnd)
+	def make(self, bnd, f_clr, f_out, agg=None):
+		_bnd = self._load_band(bnd, agg=agg)
 		if _bnd is None:
 			return
 
 		_cs = self._load_color_table(f_clr)
 		self._save_band(_bnd, _cs, f_out)
 
-	def make_perc(self, bnd, val, f_clr, f_out):
-		_bnd = self._load_band(bnd, val)
+	def make_perc(self, bnd, val, f_clr, f_out, agg=None):
+		_bnd = self._load_band(bnd, val, agg=agg)
 		if _bnd is None:
 			return
 
 		_cs = self._interp_colors(self._load_color_table(f_clr), val)
+
+		# import json
+		# json.dump(_cs, open('test1.txt', 'w'))
+		# self._save_band(_bnd, _cs, 'test1.png')
 		self._save_band(_bnd, _cs, f_out)
 

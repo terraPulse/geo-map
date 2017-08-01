@@ -44,6 +44,7 @@ class web(serv_base.service_base):
 
 	def task(self, path):
 		import os
+		import re
 		from gio import config
 		from gio import file_unzip
 
@@ -58,7 +59,7 @@ class web(serv_base.service_base):
 			raise Exception('no file found %s' % _f_res)
 
 		logging.info('loading web path: ' + path)
-		if _f_res.endswith('js/map.js'):
+		if re.search('js/map.*\.js', _f_res):
 			with file_unzip.file_unzip() as _zip:
 				return self.output_file(self._add_maps(_f_res, _zip))
 		return self.output_file(_f_res)
@@ -148,8 +149,17 @@ class map_obj(serv_base.service_base):
 			return
 			# return _tods.append(f)
 
+		import re
+		_m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
+		_lev = int(_m.group(2))
+		if _lev < 9:
+			return
+
+		_col = int(_m.group(3))
+		_row = int(_m.group(4))
+
 		_jobs.append(f)
-		print '+', len(_jobs)
+		print '+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row)
 
 		try:
 			return self._dmap_single(f, f_out)
@@ -176,6 +186,7 @@ class map_obj(serv_base.service_base):
 
 		_out = os.path.join(config.get('general', 'map_path'), _tag)
 		_inp = None
+		_agg = None
 
 		if config.cfg.has_section(_tag):
 			_inp = config.get(_tag, 'file', '')
@@ -190,6 +201,7 @@ class map_obj(serv_base.service_base):
 				_inp = _met.get('file')
 				_pec = _met.getint('percent')
 				_clr = _met.get('color')
+				_agg = _met.get('agg')
 
 		if _inp is None:
 			return
@@ -200,7 +212,7 @@ class map_obj(serv_base.service_base):
 		# _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
 		from geo_map_util import map_tile
-		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _clr, _out)
+		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _clr, _out, agg=_agg)
 		logging.info('generated tile %s' % f_inp)
 
 	def _format_path(self, p):

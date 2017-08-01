@@ -11,6 +11,12 @@ Description: make tiling tasks
 
 import logging
 
+def format_path(p):
+	if p.startswith('/a/'):
+		return '/'.join([''] + p.split('/')[3:])
+
+	return p
+
 def load_shp(f):
 	from osgeo import ogr
 	from gio import geo_base as gb
@@ -163,7 +169,7 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make(f_inp, f_clr, levels, title, percent, d_out, fzip):
+def make(f_inp, f_clr, levels, title, percent, agg, d_out, fzip):
 	import os
 
 	# detect the extent of input file
@@ -220,7 +226,11 @@ def make(f_inp, f_clr, levels, title, percent, d_out, fzip):
 		_obj.percent = percent
 	if title:
 		_obj.title = title
+
 	_obj.visible = True
+
+	if agg:
+		_obj.agg = agg
 
 	_obj.save(os.path.join(d_out, 'setting.ini'))
 
@@ -231,13 +241,13 @@ def main(opts):
 	from gio import config
 
 	import os
-	_d_out = os.path.abspath(os.path.join(config.get('conf', 'output'), opts.tag))
+	_d_out = format_path(os.path.abspath(os.path.join(config.get('conf', 'output'), opts.tag)))
 	os.path.exists(_d_out) or os.makedirs(_d_out)
 
 	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
-		make(os.path.abspath(config.get('conf', 'input')), config.get('conf', 'color'), \
-				opts.levels, opts.title, opts.percent, _d_out, _zip)
+		make(format_path(os.path.abspath(config.get('conf', 'input'))), config.get('conf', 'color'), \
+				opts.levels, opts.title, opts.percent, opts.agg, _d_out, _zip)
 
 def usage():
 	_p = environ_mag.usage(False)
@@ -246,6 +256,7 @@ def usage():
 	_p.add_argument('-o', '--output', dest='output')
 	_p.add_argument('-c', '--color', dest='color')
 	_p.add_argument('-t', '--tag', dest='tag', required=True)
+	_p.add_argument('-a', '--agg', dest='agg')
 	_p.add_argument('--title', dest='title')
 	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
 	_p.add_argument('-l', '--levels', dest='levels', default=[5, 11], nargs=2, type=int)
