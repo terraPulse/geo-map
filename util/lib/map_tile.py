@@ -53,7 +53,7 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make_tile(f, lev, col, row, percent, f_clr, d_out, agg=None):
+def make_tile(f, lev, col, row, percent, vals, f_clr, f_msk, d_out, agg=None):
 	# from osgeo import gdal
 	# gdal.UseExceptions()
 
@@ -78,9 +78,9 @@ def make_tile(f, lev, col, row, percent, f_clr, d_out, agg=None):
 
 		logging.debug('generate tile %s' % _f)
 		if percent != None:
-			band(f, lev, _eee, _zip).make_perc(_ext, percent, f_clr, _f, agg=agg)
+			band(f, lev, _eee, f_msk, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg)
 		else:
-			band(f, lev, _eee, _zip).make(_ext, f_clr, _f, agg=agg)
+			band(f, lev, _eee, f_msk, _zip).make(_ext, f_clr, _f, agg=agg)
 
 class color_table:
 
@@ -152,7 +152,7 @@ class color_table:
 
 class band:
 
-	def __init__(self, f, lev, e, fzip):
+	def __init__(self, f, lev, e, f_msk, fzip):
 		self.bnd = []
 		if f.endswith('.shp'):
 			if lev > 6:
@@ -174,6 +174,11 @@ class band:
 			self.bnd = filter(lambda x: x is not None, [_img.get_band(_b + 1) for _b in xrange(_img.band_num)])
 
 		self.color = self.bnd[0].color_table if len(self.bnd) == 1 else None
+
+		self.mask = None
+		if f_msk:
+			self.mask = gx.geo_band_stack_zip.from_shapefile(f_msk) if f_msk.endswith('.shp') \
+					else ge.open(f_msk).get_band()
 
 	def _color(self, c):
 		_cs = {}
@@ -237,13 +242,13 @@ class band:
 		_c1 = _c1 + [255]
 
 		_ss = [(_c2[i] - _c1[i]) / float(max_val) for i in xrange(len(_c1))]
-		_cs = {0: [255, 255, 255, 255]}
+		_cs = {0: [255, 255, 255, 255], 255: [0, 0, 0, 0]}
 
 		for i in xrange(scale):
 			# _cs[i + 1] = [int(_c1[_b] + (min(i, max_val) * _ss[_b]))  for _b in xrange(len(_c1))]
 			_cs[i + 1] = map(lambda x: max(0, min(255, x)), [int(_c1[_b] + i * _ss[_b])  for _b in xrange(len(_c1))])
 			if len(_cs[i+1]) > 3:
-				_cs[i+1][-1] = max(_cs[i+1][-1], 50)
+				_cs[i+1][-1] = max(_cs[i+1][-1], 255)
 
 			# print i, _cs[i]
 
@@ -271,29 +276,40 @@ class band:
 				int(math.ceil(bnd.height * float(div))),
 				bnd.proj)
 
-	def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, agg=None):
+	def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, vals=None, agg=None):
 		from gio import config
 		from gio import agg_band
 
 		if perc != None:
-			if zoom <= 2:
+			if zoom <= 1:
+				import numpy as np
+
 				_bnd = self.bnd[0].read_block(bnd_out)
-				_dat = _bnd.data
+				_ddd = _bnd.data
 
-				_dd0 = _dat == _bnd.nodata
-				_dd1 = _dat != _bnd.nodata
+				_dat = _ddd.astype(np.uint8)
+				_dat.fill(255)
 
-				_dv1 = _dd1 & (_dat != perc)
-				_dv2 = _dat == perc
+				if vals:
+					for _v in vals:
+						if _v == _bnd.nodata:
+							continue
 
-				_dat[_dv1] = 0
+						_dat[_ddd == _v] = 0
+				else:
+					_dd1 = _ddd != _bnd.nodata
+					_dv1 = _dd1 & (_ddd != perc)
+
+					_dat[_dv1] = 0
+
+				_dv2 = _ddd == perc
 				_dat[_dv2] = 100
-				_dat[_dd0] = 255
 
-				_bnd.data = _dat
+				_bnd = _bnd.from_grid(_dat, nodata=255)
 				return _bnd
 
-			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc)
+			# bnd_inp.read_block(bnd_out.scale(zoom)).save('test_org.tif')
+			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
 		if zoom <= 2:
 			return self.bnd[0].read_block(bnd_out)
@@ -319,18 +335,20 @@ class band:
 		import sys
 		sys.exit(0)
 
-	def _load_band(self, bnd, perc=None, agg=None):
+	def _load_band(self, bnd, perc=None, vals=None, agg=None):
 		if len(self.bnd) == 1:
-			_zoom = min(int(bnd.geo_transform[1] / (self.bnd[0].cell_size * 3)), 10)
-			_bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, agg)
+			_zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 10)
+			_bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg)
+			# _bnd.save('test_data2.tif')
+
 			# if perc != None:
 			# 	_idx = (_bnd.data > 0) & (_bnd.data < 10)
 			# 	_bnd.data[_idx] = 10
 
-			from gio import config
-			if config.cfg.getboolean('conf', 'mmu'):
-				import filter_band
-				_bnd = filter_band.mmu(_bnd, 1, 1)
+			# from gio import config
+			# if config.cfg.getboolean('conf', 'mmu'):
+			# 	import filter_band
+			# 	_bnd = filter_band.mmu(_bnd, 1, 1)
 
 			return [_bnd]
 		else:
@@ -346,6 +364,12 @@ class band:
 		if len(bnd) == 1:
 			if bnd[0] == None:
 				return
+
+			if self.mask is not None:
+				_msk = self.mask.read_block(bnd[0])
+				if _msk:
+					bnd[0].data[_msk.data != 1] = bnd[0].nodata
+
 			self._save(bnd[0], cs, f_out)
 		else:
 			from osgeo import gdal
@@ -365,15 +389,17 @@ class band:
 		_cs = self._load_color_table(f_clr)
 		self._save_band(_bnd, _cs, f_out)
 
-	def make_perc(self, bnd, val, f_clr, f_out, agg=None):
-		_bnd = self._load_band(bnd, val, agg=agg)
+	def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None):
+		_bnd = self._load_band(bnd, val, vals, agg=agg)
 		if _bnd is None:
 			return
 
 		_cs = self._interp_colors(self._load_color_table(f_clr), val)
 
 		# import json
-		# json.dump(_cs, open('test1.txt', 'w'))
-		# self._save_band(_bnd, _cs, 'test1.png')
+		# json.dump(_cs, open('test_color.txt', 'w'))
+		# _bnd[0].save('test_data.tif')
+		# self._save_band(_bnd, _cs, 'test_preview.png')
+
 		self._save_band(_bnd, _cs, f_out)
 

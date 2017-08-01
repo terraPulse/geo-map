@@ -169,7 +169,7 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make(f_inp, f_clr, levels, title, percent, agg, d_out, fzip):
+def make(f_inp, f_clr, levels, title, percent, valid_vals, agg, d_out, fzip, opts):
 	import os
 
 	# detect the extent of input file
@@ -192,10 +192,11 @@ def make(f_inp, f_clr, levels, title, percent, agg, d_out, fzip):
 	_tiles = tiles()
 
 	_ps = []
+	print opts.mask
 	for _lev in xrange(levels[0], levels[1]+1):
 		print ' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev)
 		for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
-			_ps.append((f_inp, _lev, _num, _col, _row, percent, _f_clr, d_out))
+			_ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, _f_clr, opts.mask, d_out))
 
 	logging.info('found %s task' % len(_ps))
 	print 'found %s tasks' % len(_ps)
@@ -227,6 +228,12 @@ def make(f_inp, f_clr, levels, title, percent, agg, d_out, fzip):
 	if title:
 		_obj.title = title
 
+	if valid_vals:
+		_obj.valid_vals = valid_vals
+
+	if opts.mask:
+		_obj.mask = opts.mask
+
 	_obj.visible = True
 
 	if agg:
@@ -247,7 +254,7 @@ def main(opts):
 	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
 		make(format_path(os.path.abspath(config.get('conf', 'input'))), config.get('conf', 'color'), \
-				opts.levels, opts.title, opts.percent, opts.agg, _d_out, _zip)
+				opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_out, _zip, opts)
 
 def usage():
 	_p = environ_mag.usage(False)
@@ -259,6 +266,8 @@ def usage():
 	_p.add_argument('-a', '--agg', dest='agg')
 	_p.add_argument('--title', dest='title')
 	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
+	_p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
+	_p.add_argument('-m', '--mask', dest='mask')
 	_p.add_argument('-l', '--levels', dest='levels', default=[5, 11], nargs=2, type=int)
 
 	return _p
