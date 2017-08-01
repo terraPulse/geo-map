@@ -33,9 +33,12 @@
 	  <body>
 		<div id="header"><h1>Crop Mapping</h1></div>
 		<div id="subheader">
+			<!--
 			<input type="checkbox" id="btn_wrs_tile" /><label for="btn_wrs_tile">Tile</label>
-			<input type="checkbox" id="btn_wrs_pixel" /><label for="btn_wrs_pixel">Pixel</label>
 			<input type="checkbox" id="btn_ndvi" /><label for="btn_ndvi">NDVI</label>
+			-->
+			<input type="checkbox" id="btn_wrs_pixel" /><label for="btn_wrs_pixel">Locate</label>
+			<button id="btn_goto_location">Coordinate</button>
 		</div>
 		<div id="map">
 		</div>
@@ -47,5 +50,10 @@
 		<img id="img_ndvi" src="" style="height: 350px; width: 700px;"></img>
 	</p>
 	<p id='dlg_alert' title='Info' style="text-align: left;">
+	</p>
+	<p id='dlg_goto_location' title='Coordinate' style="text-align: left;">
+		<label for="val_goto_location_x">Lon: </label><input style='width: 100px;' id="val_goto_location_x" value='0.0' />
+		<span> &nbsp; </span>
+		<label for="val_goto_location_y">Lat: </label><input style='width: 100px;' id="val_goto_location_y" value='0.0' />
 	</p>
 	</html>

@@ -4,7 +4,7 @@ var mapBounds = new OpenLayers.Bounds(-180.000000, -82.640100, 180.000000, 81.85
 // var mapBounds = new OpenLayers.Bounds(27.497144, -16.299964, 30.591724, -14.141325);
 // var mapBounds = new OpenLayers.Bounds(21.201199, -18.188537, 34.882154, -7.936012);
 
-var mapMinZoom = 6;
+var mapMinZoom = 5;
 var mapMaxZoom = 16;
 var emptyTileURL = "http://www.maptiler.org/img/none.png";
 OpenLayers.IMAGE_RELOAD_ATTEMPTS = 3;
@@ -90,7 +90,7 @@ function create_json_layer(path, title, col, min_res){
 	});
 }
 
-function init(){
+function init_map(){
 	var options = {
 		div: "map",
 		controls: [],
@@ -98,7 +98,51 @@ function init(){
 		displayProjection: new OpenLayers.Projection("EPSG:4326"),
 		numZoomLevels: mapMaxZoom
 	};
+
 	map = new OpenLayers.Map(options);
+
+	map.create_vector_layer = function() {
+		var layer_style = OpenLayers.Util.extend({}, OpenLayers.Feature.Vector.style['default']);
+		layer_style.fillOpacity = 0;
+		layer_style.strokeColor = "#EEEEEE";
+		layer_style.strokeWidth = 1;
+		layer_style.strokeOpacity = 0.9;
+		
+		var _styleMap = new OpenLayers.StyleMap( {
+				'default' : layer_style
+			});
+
+		_styleMap.styles['default'].addRules([
+			new OpenLayers.Rule({
+					filter: new OpenLayers.Filter.Comparison({
+					type: OpenLayers.Filter.Comparison.EQUAL_TO,
+					property: "type",
+					value: "phenology"}),
+					symbolizer: {strokeColor: "blue"}
+				}),
+				new OpenLayers.Rule({
+					elseFilter: true
+				})
+			]);
+		
+		return _styleMap;
+	};
+
+	map.create_draw_layer_style = function() {
+		var layer_style = OpenLayers.Util.extend({}, OpenLayers.Feature.Vector.style['default']);
+		layer_style.fillOpacity = 0.2;
+		layer_style.fillColor = '#11AA33';
+		layer_style.strokeColor = "#22FF44";
+		layer_style.pointRadius = 5;
+		layer_style.strokeWidth = 1;
+		layer_style.strokeOpacity = 0.9;
+		
+		var _styleMap = new OpenLayers.StyleMap( {
+				'default' : layer_style
+			});
+
+		return _styleMap;
+	};
 
 	var gsat = new OpenLayers.Layer.Google("Google Satellite",
 		{
@@ -120,7 +164,7 @@ function init(){
 	var osm = new OpenLayers.Layer.OSM("OpenStreetMap");
 
 	// create TMS Overlay layer
-	map.addLayers([gsat, ghyb, gter, osm]);
+	map.addLayers([ghyb, gsat, gter, osm]);
 
 	// map.addLayer(create_layer('/map/zambia_01', 'Zambia 01'));
 	// map.addLayer(create_layer('/map/crop03', 'Crop 03'));
@@ -153,26 +197,30 @@ function init(){
 	map.addLayer(create_layer('/map/zambia_s2_maize_v2.50', 'Zambia Maize 2016 v2.50'));
 	map.addLayer(create_layer('/map/mozambique_crop02_01', 'mozambique_crop02_01'));
 
-	map.addLayer(create_json_layer('/map/zambia_tiles.json', 'Zambia Tiles'));
 	*/
 
 	// map.addLayer(create_layer('/map/hungary_01', 'Hungary v0.01'));
-	map.addLayer(create_layer('/map/hungary_02', 'Hungary v0.2'));
+	// map.addLayer(create_layer('/map/hungary_02', 'Hungary v0.2'));
 	// map.addLayer(create_json_layer('/map/tiles_hungary.json', 'Hungary tiles'));
 
+	/*
 	map.addLayer(create_layer('/map/south_africa_wheat01', 'South Africa v1.0'));
 	map.addLayer(create_layer('/map/south_africa_wheat02', 'South Africa v2.0'));
 	map.addLayer(create_layer('/map/zimbabwe_s2_crop02', 'Zimbabwi v0.2'));
 	map.addLayer(create_layer('/map/zimbabwe_s2_merge', 'Zimbabwi v0.2 (cmb)'));
 	map.addLayer(create_layer('/map/zimbabwe_s2_crop04', 'Zimbabwi v0.4'));
 	map.addLayer(create_layer('/map/zimbabwe_s2_crop04_comb', 'Zimbabwi v0.4 (cmb)'));
+	*/
 	// map.addLayer(create_layer('/map/malawi_maize_01', 'Malawi v0.1'));
 	// map.addLayer(create_layer('/map/malawi_s2_a_01', 'Malawi v0.20'));
 	// map.addLayer(create_layer('/map/malawi_maize_01_cmb', 'Malawi v0.25 (cmb)'));
+	/*
 	map.addLayer(create_layer('/map/q1_s2_v02', 'Q1 season2 v0.2'));
 	map.addLayer(create_layer('/map/malawi_s2_b_01', 'Malawi v0.25'));
+	*/
 	// **map**
 
+	map.addLayer(create_json_layer('/map/tiles/tiles_nigeria.geojson', 'Tiles Nigeria'));
 
 	// map.addLayer(create_layer('/map/zimbabwi_s2_04', 'Zimbabwi v0.4'));
 
@@ -207,6 +255,44 @@ function init(){
 	var _pixel = new OpenLayers.Control.PixelClick();
 	map.addControl(_pixel);
 	map_ctrls['pixel'] = _pixel;
+
+
+	// add a layer for showing the selected location on map
+	var _draw = new OpenLayers.Layer.Vector("Point", {
+		'styleMap' : map.create_draw_layer_style()
+	});
+	map.addLayer(_draw);
+	map.draw = _draw;
+
+	map.put_point = function(lon, lat, zoom=false){
+		var _geo = new OpenLayers.LonLat(lon, lat);
+		this.draw.removeAllFeatures();
+
+		var _loc = _geo.clone().transform(this.displayProjection, this.projection);
+		this.draw.addFeatures([new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(_loc.lon, _loc.lat), {})]);
+
+		if(zoom)
+			this.set_center(lon, lat, this.getZoom());
+		// init_scenes(_geo.lon, _geo.lat);
+	};
+
+	map.set_center = function(x, y, level) {
+		var _pt1 = new OpenLayers.LonLat(x, y).transform(
+				this.displayProjection, this.projection);
+
+		// var _layer = this.getLayersByName('Vector')[0];
+		// _layer.removeFeatures(_layer.features);
+		// 
+		// var _fs = [
+		// 		new OpenLayers.Feature.Vector(
+		// 				new OpenLayers.Bounds(_pt1.lon-15, _pt1.lat+15, _pt1.lon+15, _pt1.lat-15).toGeometry()
+		// 			)];
+
+		// _layer.addFeatures(_fs);
+
+		this.setCenter(_pt1, level);
+	};
+
 }
 
 function getURL(bounds) {

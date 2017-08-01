@@ -42,14 +42,25 @@ OpenLayers.Control.TileClick = OpenLayers.Class(OpenLayers.Control, {
 });
 
 function show_pixel(loc){
-	$('#dlg_tile').dialog('open');
+	// $('#dlg_tile').dialog('open');
 
-	call('/_pixel', {x: loc.lon, y: loc.lat}, function(data){
-		alert_dlg(data);
-	});
+	// call('/_pixel', {x: loc.lon, y: loc.lat}, function(data){
+	// 	alert_dlg(data);
+	// });
+	//
+	// alert_win('Coordiniate: ' + loc.lon.toFixed(4) + ', ' + loc.lat.toFixed(4));
+	//
+	var _x = loc.lon.toFixed(5);
+	var _y = loc.lat.toFixed(5);
+
+	$('#val_goto_location_x').val(_x);
+	$('#val_goto_location_y').val(_y);
+
+	map.put_point(_x, _y);
+	$('#dlg_goto_location').dialog('open');
 }
 
-OpenLayers.Control.PixelClick = OpenLayers.Class(OpenLayers.Control, {                
+OpenLayers.Control.PixelClick = OpenLayers.Class(OpenLayers.Control, {
 	defaultHandlerOptions: {
 		'single': true,
 		'double': false,
