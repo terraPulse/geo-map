@@ -234,6 +234,9 @@ def make(f_inp, f_clr, levels, title, percent, valid_vals, agg, d_out, fzip, opt
 	if opts.mask:
 		_obj.mask = opts.mask
 
+	if opts.solid_bg:
+		_obj.solid_bg = True
+
 	_obj.visible = True
 
 	if agg:
@@ -266,6 +269,7 @@ def usage():
 	_p.add_argument('-a', '--agg', dest='agg')
 	_p.add_argument('--title', dest='title')
 	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
+	_p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
 	_p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
 	_p.add_argument('-m', '--mask', dest='mask')
 	_p.add_argument('-l', '--levels', dest='levels', default=[5, 11], nargs=2, type=int)

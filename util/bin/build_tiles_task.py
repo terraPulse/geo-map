@@ -9,12 +9,12 @@ Create: 2015-09-10 16:02:12
 Description:
 '''
 
-def _make_tile(f, lev, num, col, row, pec, vals, clr, msk, out):
+def _make_tile(f, lev, num, col, row, pec, vals, transparent_bg, clr, msk, out):
 	# if not (lev == 7 and col == 29 and row == 79):
 	# 	return
 
 	from geo_map_util import map_tile
-	map_tile.make_tile(f, lev, col, row, pec, vals, clr, msk, out)
+	map_tile.make_tile(f, lev, col, row, pec, vals, transparent_bg, clr, msk, out)
 
 def main(opts):
 	import pickle

@@ -20,6 +20,7 @@ class web(serv_base.service_base):
 		_fs = []
 		for _d in sorted(os.listdir(_d_map)):
 			_f = os.path.join(_d_map, _d, 'setting.ini')
+			logging.info('loading %s' % _f)
 			if os.path.exists(_f):
 				_obj = obj.load(_f)
 
@@ -188,6 +189,7 @@ class map_obj(serv_base.service_base):
 		_inp = None
 		_agg = None
 		_valid_vals = None
+		_solid_bg = False
 		_mask = None
 
 		if config.cfg.has_section(_tag):
@@ -203,6 +205,7 @@ class map_obj(serv_base.service_base):
 				_inp = _met.get('file')
 				_pec = _met.getint('percent')
 				_clr = _met.get('color')
+				_solid_bg = _met.get('solid_bg')
 				_agg = _met.get('agg')
 
 				_valid_vals = _met.get('valid_vals')
@@ -217,7 +220,7 @@ class map_obj(serv_base.service_base):
 		# _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
 		from geo_map_util import map_tile
-		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _clr, _mask, _out, agg=_agg)
+		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg)
 
 		logging.debug('generated tile %s' % f_inp)
 

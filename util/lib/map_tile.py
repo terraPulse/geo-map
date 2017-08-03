@@ -53,7 +53,7 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make_tile(f, lev, col, row, percent, vals, f_clr, f_msk, d_out, agg=None):
+def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None):
 	# from osgeo import gdal
 	# gdal.UseExceptions()
 
@@ -78,9 +78,9 @@ def make_tile(f, lev, col, row, percent, vals, f_clr, f_msk, d_out, agg=None):
 
 		logging.debug('generate tile %s' % _f)
 		if percent != None:
-			band(f, lev, _eee, f_msk, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg)
+			band(f, lev, _eee, f_msk, solid_bg, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg)
 		else:
-			band(f, lev, _eee, f_msk, _zip).make(_ext, f_clr, _f, agg=agg)
+			band(f, lev, _eee, f_msk, solid_bg, _zip).make(_ext, f_clr, _f, agg=agg)
 
 class color_table:
 
@@ -152,7 +152,7 @@ class color_table:
 
 class band:
 
-	def __init__(self, f, lev, e, f_msk, fzip):
+	def __init__(self, f, lev, e, f_msk, solid_bg, fzip):
 		self.bnd = []
 		if f.endswith('.shp'):
 			if lev > 6:
@@ -174,6 +174,7 @@ class band:
 			self.bnd = filter(lambda x: x is not None, [_img.get_band(_b + 1) for _b in xrange(_img.band_num)])
 
 		self.color = self.bnd[0].color_table if len(self.bnd) == 1 else None
+		self.solid_bg = solid_bg
 
 		self.mask = None
 		if f_msk:
@@ -231,9 +232,28 @@ class band:
 			raise Exception('no color table provided')
 
 		_c2 = cs[v_val]
-		# _c1 = [255, 255, 255, 0] #cs[v_non]
-		# _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
-		# _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
+		_c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
+
+		if len(_c1) > 3:
+			_c1 = _c1[:3]
+		_c1 = _c1 + [255]
+
+		_ss = [(_c2[i] - _c1[i]) / float(max_val) for i in xrange(len(_c1))]
+		_cs = {0: [0, 0, 0, 0], 255: [0, 0, 0, 0]}
+
+		for i in xrange(scale):
+			# _cs[i + 1] = [int(_c1[_b] + (min(i, max_val) * _ss[_b]))  for _b in xrange(len(_c1))]
+			_cs[i + 1] = map(lambda x: max(0, min(255, x)), [int(_c1[_b] + i * _ss[_b])  for _b in xrange(len(_c1))])
+			if len(_cs[i+1]) > 3:
+				_cs[i+1][-1] = max(_cs[i+1][-1], 30)
+
+		return _cs
+
+	def _interp_colors_solid_bg(self, cs, v_val, scale=100, max_val=100):
+		if cs == None or len(cs.keys()) == 0:
+			raise Exception('no color table provided')
+
+		_c2 = cs[v_val]
 		_c1 = [255, 255, 255]
 
 		if len(_c1) > 3:
@@ -249,8 +269,6 @@ class band:
 			_cs[i + 1] = map(lambda x: max(0, min(255, x)), [int(_c1[_b] + i * _ss[_b])  for _b in xrange(len(_c1))])
 			if len(_cs[i+1]) > 3:
 				_cs[i+1][-1] = max(_cs[i+1][-1], 255)
-
-			# print i, _cs[i]
 
 		return _cs
 
@@ -339,6 +357,7 @@ class band:
 		if len(self.bnd) == 1:
 			_zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 10)
 			_bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg)
+
 			# _bnd.save('test_data2.tif')
 
 			# if perc != None:
@@ -394,7 +413,10 @@ class band:
 		if _bnd is None:
 			return
 
-		_cs = self._interp_colors(self._load_color_table(f_clr), val)
+		if self.solid_bg:
+			_cs = self._interp_colors_solid_bg(self._load_color_table(f_clr), val)
+		else:
+			_cs = self._interp_colors(self._load_color_table(f_clr), val)
 
 		# import json
 		# json.dump(_cs, open('test_color.txt', 'w'))
