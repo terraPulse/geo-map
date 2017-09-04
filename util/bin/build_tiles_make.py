@@ -196,7 +196,8 @@ def make(f_inp, f_clr, levels, title, percent, valid_vals, agg, d_out, fzip, opt
 	for _lev in xrange(levels[0], levels[1]+1):
 		print ' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev)
 		for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
-			_ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, _f_clr, opts.mask, d_out))
+			_ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
+					_f_clr, opts.mask, d_out))
 
 	logging.info('found %s task' % len(_ps))
 	print 'found %s tasks' % len(_ps)

@@ -406,6 +406,12 @@ class band:
 			return
 
 		_cs = self._load_color_table(f_clr)
+
+		# import json
+		# json.dump(_cs, open('test_color.txt', 'w'))
+		# _bnd[0].save('test_data.tif')
+		# self._save_band(_bnd, _cs, 'test_preview.png')
+
 		self._save_band(_bnd, _cs, f_out)
 
 	def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None):
