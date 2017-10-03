@@ -260,8 +260,20 @@ def main(opts):
 		make(format_path(os.path.abspath(config.get('conf', 'input'))), config.get('conf', 'color'), \
 				opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_out, _zip, opts)
 
+	if opts.execute:
+		print 'generate map tiles'
+
+		_cmd = 'build_tiles_task.py -t %s ' % opts.tag
+		_agg = ' -a %s ' % opts.agg if opts.agg else ''
+		_tsk = '-in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
+				opts.instance_num, opts.instance_pos, opts.task_num, \
+						'-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
+
+		from gio import run_commands
+		run_commands.run(_cmd + _agg + _tsk)
+
 def usage():
-	_p = environ_mag.usage(False)
+	_p = environ_mag.usage(True)
 
 	_p.add_argument('-i', '--input', dest='input', required=True)
 	_p.add_argument('-o', '--output', dest='output')
@@ -273,7 +285,10 @@ def usage():
 	_p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
 	_p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
 	_p.add_argument('-m', '--mask', dest='mask')
-	_p.add_argument('-l', '--levels', dest='levels', default=[5, 11], nargs=2, type=int)
+	_p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
+
+	_p.add_argument('-e', '--execute', dest='execute', action='store_true', \
+		help='run build_tiles_task.py after the map task is generated')
 
 	return _p
 
