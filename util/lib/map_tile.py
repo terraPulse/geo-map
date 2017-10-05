@@ -298,7 +298,7 @@ class band:
 		from gio import config
 		from gio import agg_band
 
-		if perc != None:
+		if perc is not None:
 			if zoom <= 1:
 				import numpy as np
 
@@ -329,10 +329,13 @@ class band:
 			# bnd_inp.read_block(bnd_out.scale(zoom)).save('test_org.tif')
 			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
-		if zoom <= 2:
-			return self.bnd[0].read_block(bnd_out)
-
 		_agg = agg or config.cfg.get('conf', 'aggregate').strip()
+
+		if zoom <= 1:
+			_bnd = self.bnd[0].read_block(bnd_out)
+			if _agg == 'mean':
+				_bnd.data[_bnd.data > 100] = _bnd.nodata
+			return _bnd
 
 		if _agg in [None, '', 'none', 'dominated']:
 			return agg_band.dominated(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, False)
