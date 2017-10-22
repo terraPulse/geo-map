@@ -154,7 +154,7 @@ class map_obj(serv_base.service_base):
 		import re
 		_m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
 		_lev = int(_m.group(2))
-		if _lev <= 10:
+		if _lev <= 9:
 			return
 
 		_col = int(_m.group(3))

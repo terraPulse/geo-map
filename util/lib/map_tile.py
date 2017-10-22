@@ -330,6 +330,7 @@ class band:
 			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
 		_agg = agg or config.cfg.get('conf', 'aggregate').strip()
+		print _agg, zoom, perc
 
 		if zoom <= 1:
 			_bnd = self.bnd[0].read_block(bnd_out)

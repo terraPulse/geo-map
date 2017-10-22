@@ -39,22 +39,24 @@ def get_ip_address():
 
 	return _d[0]
 
+def before_response(r):
+	r.headers['max-age'] = 60
+	return r
+
 def op(path):
 	import re
 	from flask import request
 	from geo_map_serv2 import serv_op, serv_web
 
-	# return '%s_____' % request.values['test']
-
 	_m = re.match('_(.+)', path)
 	if _m:
-		return serv_op.op(request).get(_m.group(1))
+		return before_response(serv_op.op(request).get(_m.group(1)))
 
 	_m = re.match('map/(.+)', path)
 	if _m:
-		return serv_web.map_obj(request).get(_m.group(1))
+		return before_response(serv_web.map_obj(request).get(_m.group(1)))
 
-	return serv_web.web(request).get(path)
+	return before_response(serv_web.web(request).get(path))
 
 	# from flask import abort
 	# abort(404)
@@ -65,7 +67,7 @@ def main(opts):
 
 	_app = Flask(__name__)
 	_app.add_url_rule('/', 'index', op, defaults={'path': ''})
-	_app.add_url_rule('/<path:path>', 'index', op)
+	_app.add_url_rule('/<path:path>', 'index', op, methods=['GET', 'POST'])
 	_app.register_error_handler(404, not_found)
 
 	if config.getboolean('conf', 'debug', False) == False:
@@ -77,7 +79,9 @@ def main(opts):
 		_ip = get_ip_address()
 
 	logging.info('ip address: ' + _ip)
-	_app.run(host=_ip, port=config.getint('conf', 'port', 8090))
+	_app.run(host=_ip, port=config.getint('conf', 'port', 8090), \
+			threaded=config.getboolean('conf', 'threaded', False), \
+			processes=config.getint('conf', 'process', 3))
 
 def usage():
 	_p = environ_mag.usage(False)
