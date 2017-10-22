@@ -329,8 +329,7 @@ class band:
 			# bnd_inp.read_block(bnd_out.scale(zoom)).save('test_org.tif')
 			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
-		_agg = agg or config.cfg.get('conf', 'aggregate').strip()
-		print _agg, zoom, perc
+		_agg = agg or config.get('conf', 'aggregate').strip()
 
 		if zoom <= 1:
 			_bnd = self.bnd[0].read_block(bnd_out)
@@ -369,7 +368,7 @@ class band:
 			# 	_bnd.data[_idx] = 10
 
 			# from gio import config
-			# if config.cfg.getboolean('conf', 'mmu'):
+			# if config.getboolean('conf', 'mmu'):
 			# 	import filter_band
 			# 	_bnd = filter_band.mmu(_bnd, 1, 1)
 
