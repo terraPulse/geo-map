@@ -329,7 +329,9 @@ class band:
 			# bnd_inp.read_block(bnd_out.scale(zoom)).save('test_org.tif')
 			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
-		_agg = agg or config.get('conf', 'aggregate').strip()
+		_agg = agg or config.get('conf', 'aggregate')
+		if _agg:
+			_agg = _agg.strip()
 
 		if zoom <= 1:
 			_bnd = self.bnd[0].read_block(bnd_out)
