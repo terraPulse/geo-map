@@ -29,6 +29,14 @@ class op(serv_base.service_base):
 			else:
 				self.output_json(_rs)
 
+	def _viewshed(self, x, y, frm=None):
+		from gio import config
+
+		_l = config.get('general', 'dem_path', '/data/glcf-st-004/data/workspace/fengm/data/srtm/data/list/srtm_30m.shp')
+
+		from viewshed import lib_viewshed
+		self.output_json(lib_viewshed.viewshed_region(_l, x, y, max_dist=30000, cell=90, elevation=2.0))
+
 	def _ndvi_chart(self, x, y):
 		from gio import file_unzip
 		from gio import run_commands
@@ -67,6 +75,12 @@ class op(serv_base.service_base):
 
 			return self._ndvi(_x, _y, self.pp('frm', None))
 			# return self._ndvi_chart(_x, _y)
+
+		if path == 'viewshed':
+			_x = self.pf('x')
+			_y = self.pf('y')
+
+			return self._viewshed(_x, _y)
 
 		if path == 'tile':
 			_x = self.pf('x')
