@@ -56,20 +56,21 @@ class tiles:
 def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
 	# from osgeo import gdal
 	# gdal.UseExceptions()
-
-	from gio import file_unzip
 	import os
 
+	_d = os.path.join(d_out, str(lev), str(col))
+
+	_f = os.path.join(_d, '%s.png' % row)
+	if os.path.exists(_f) and os.path.getsize(_f) > 0:
+		logging.debug('skip %s' % _f)
+		return
+
+	from gio import file_unzip
 	with file_unzip.file_unzip() as _zip:
-		_d = os.path.join(d_out, str(lev), str(col))
 		try:
 			os.path.exists(_d) or os.makedirs(_d)
 		except Exception:
 			pass
-
-		_f = os.path.join(_d, '%s.png' % row)
-		if os.path.exists(_f) and os.path.getsize(_f) > 0:
-			return
 
 		_ext = tiles().extent(lev, col, row)
 
