@@ -63,6 +63,7 @@ class web(serv_base.service_base):
 		if re.search('js/map.*\.js', _f_res):
 			with file_unzip.file_unzip() as _zip:
 				return self.output_file(self._add_maps(_f_res, _zip))
+
 		return self.output_file(_f_res)
 
 class web_app(web):

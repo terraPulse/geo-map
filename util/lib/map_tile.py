@@ -268,7 +268,7 @@ class band:
 		_mag = (1 if mag is None else mag)
 
 		_cs = {255: [255, 255, 255, 0]}
-		for i in xrange(scale):
+		for i in xrange(scale + 1):
 			_t = min(int(i * 2.56 * _mag), 255)
 			_cs[i] = list(_c2) + [_t]
 
@@ -454,7 +454,10 @@ class band:
 
 		# import json
 		# json.dump(_cs, open('test_color.txt', 'w'))
-		# _bnd[0].save(f_out[:-4] + '.tif')
+
+		# from gio import color_table as ct
+		# _bnd[0].save(f_out[:-4] + '.tif', color_table=ct.map_colortable(_cs))
+
 		# self._save_band(_bnd, _cs, 'test_preview.png')
 
 		self._save_band(_bnd, _cs, f_out)

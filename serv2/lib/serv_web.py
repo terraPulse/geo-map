@@ -57,7 +57,9 @@ class web(serv_base.service_base):
 		_f_res = os.path.join(_d_web, _path)
 
 		if not os.path.exists(_f_res):
-			raise Exception('no file found %s' % _f_res)
+			logging.error('no file found %s' % _f_res)
+			return
+			# raise Exception('no file found %s' % _f_res)
 
 		logging.info('loading web path: ' + path)
 		if re.search('js/map.*\.js', _f_res):
@@ -217,8 +219,6 @@ class map_obj(serv_base.service_base):
 
 		if _clr is None:
 			_clr = os.path.join(_out, 'color.txt')
-        #
-		# _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
 		from geo_map_util import map_tile
 		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg, opts=_met)
