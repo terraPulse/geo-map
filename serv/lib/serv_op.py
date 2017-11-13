@@ -14,7 +14,23 @@ class op(serv_base.service_base):
 	def __init__(self, request, response):
 		serv_base.service_base.__init__(self, request, response)
 
-	def _ndvi(self, x, y, frm=None):
+	def _ndvi_poly(self, fid):
+		import re
+		_m = re.match('(.+)_(\d+)', fid)
+		if _m is None:
+			raise Exception('failed to parse requested ID (%s)' % fid)
+
+		from gio import config
+		import os
+
+		_d_out = config.get('conf', 'path_ndvi_poly', '/data/mfeng/data/ndvi/region/extract/data')
+		_f_out = os.path.join(_d_out, _m.group(1).lower(), '%s.txt' % str(int(_m.group(2))))
+
+		with open(_f_out) as _fi:
+			import json
+			self.output_json(json.load(_fi))
+
+	def _ndvi(self, x, y, frm=None, tag=None):
 		import mod_ndvi
 		from gio import file_unzip
 		from gio import config
@@ -23,7 +39,7 @@ class op(serv_base.service_base):
 
 		with file_unzip.file_unzip() as _zip:
 			_f_tmp  = _zip.generate_file('', '.csv') if frm == 'csv' else None
-			_rs = mod_ndvi.extract_NDVI(_l, x, y, 600, _f_tmp)
+			_rs = mod_ndvi.extract_NDVI(_l, x, y, 600, tag, _f_tmp)
 			if _f_tmp:
 				self.output_file(_f_tmp)
 			else:
@@ -32,10 +48,11 @@ class op(serv_base.service_base):
 	def _viewshed(self, x, y, frm=None):
 		from gio import config
 
-		_l = config.get('general', 'dem_path', '/data/glcf-st-004/data/workspace/fengm/data/srtm/data/list/srtm_30m.shp')
+		_l = config.get('general', 'dem_path', '/data2/data/dem/srtm/list/srtm_30m.shp')
 
 		from viewshed import lib_viewshed
-		self.output_json(lib_viewshed.viewshed_region(_l, x, y, max_dist=30000, cell=90, elevation=2.0))
+		self.output_json(lib_viewshed.viewshed_region(_l, x, y, max_dist=self.pf('max_dist', 30000), \
+				cell=self.pf('cell', 90), elevation=self.pf('elevation', 3.0)))
 
 	def _ndvi_chart(self, x, y):
 		from gio import file_unzip
@@ -73,7 +90,7 @@ class op(serv_base.service_base):
 			_x = self.pf('x')
 			_y = self.pf('y')
 
-			return self._ndvi(_x, _y, self.pp('frm', None))
+			return self._ndvi(_x, _y, self.pp('frm', None), self.pp('tag', None))
 			# return self._ndvi_chart(_x, _y)
 
 		if path == 'viewshed':
@@ -81,6 +98,9 @@ class op(serv_base.service_base):
 			_y = self.pf('y')
 
 			return self._viewshed(_x, _y)
+
+		if path == 'ndvi_poly':
+			return self._ndvi_poly(self.pp('id'))
 
 		if path == 'tile':
 			_x = self.pf('x')

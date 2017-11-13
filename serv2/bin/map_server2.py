@@ -39,24 +39,45 @@ def get_ip_address():
 
 	return _d[0]
 
-def before_response(r):
-	r.headers['max-age'] = 60
-	return r
-
-def op(path):
+def op_req(path):
 	import re
 	from flask import request
 	from geo_map_serv2 import serv_op, serv_web
 
+	# return '%s_____' % request.values['test']
+
 	_m = re.match('_(.+)', path)
 	if _m:
-		return before_response(serv_op.op(request).get(_m.group(1)))
+		return serv_op.op(request).get(_m.group(1))
 
 	_m = re.match('map/(.+)', path)
 	if _m:
-		return before_response(serv_web.map_obj(request).get(_m.group(1)))
+		return serv_web.map_obj(request).get(_m.group(1))
 
-	return before_response(serv_web.web(request).get(path))
+	return serv_web.web(request).get(path)
+
+def op(path):
+	try:
+		_r = op_req(path)
+	except KeyboardInterrupt:
+		print '\n\n* User stopped the program'
+		import sys
+		sys.exit(0)
+	except Exception, err:
+		import traceback
+
+		logging.error(traceback.format_exc())
+		logging.error(str(err))
+
+		print '\n\n* Error:', err
+
+	_r.headers["Cache-Control"] = 'no-cache, no-store, must-revalidate'
+	_r.headers["Pragma"] = "no-cache"
+	_r.headers["Expires"] = "0"
+	_r.headers['Cache-Control'] = 'public, max-age=0'
+	_r.headers['Access-Control-Allow-Origin'] = '*'
+
+	return _r
 
 	# from flask import abort
 	# abort(404)
@@ -66,8 +87,9 @@ def main(opts):
 	from gio import config
 
 	_app = Flask(__name__)
+
 	_app.add_url_rule('/', 'index', op, defaults={'path': ''})
-	_app.add_url_rule('/<path:path>', 'index', op, methods=['GET', 'POST'])
+	_app.add_url_rule('/<path:path>', 'index', op)
 	_app.register_error_handler(404, not_found)
 
 	if config.getboolean('conf', 'debug', False) == False:
@@ -79,8 +101,26 @@ def main(opts):
 		_ip = get_ip_address()
 
 	logging.info('ip address: ' + _ip)
+
+	_ssl_key = config.get('conf', 'ssl_key')
+	_ssl_crt = config.get('conf', 'ssl_crt')
+
+	_context = None
+	if _ssl_key or _ssl_crt:
+		# from OpenSSL import SSL
+		# _context = SSL.Context(SSL.SSLv23_METHOD)
+		# if _ssl_key:
+		# 	logging.info('use SSL key' % _ssl_key)
+		# 	_context.use_privatekey_file(_ssl_key)
+		# if _ssl_crt:
+		# 	logging.info('use SSL crt' % _ssl_crt)
+		# 	_context.use_certificate_file(_ssl_crt)
+		logging.info('use SSL key %s, %s' % (_ssl_key, _ssl_crt))
+		_context = (_ssl_crt, _ssl_key)
+
 	_app.run(host=_ip, port=config.getint('conf', 'port', 8090), \
 			threaded=config.getboolean('conf', 'threaded', False), \
+			ssl_context=_context, \
 			processes=config.getint('conf', 'process', 3))
 
 def usage():

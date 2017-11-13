@@ -9,19 +9,23 @@ Create: 2015-09-10 16:02:12
 Description:
 '''
 
-def _make_tile(f, lev, num, col, row, pec, vals, solid_bg, clr, msk, out):
+def _make_tile(f, lev, num, col, row, pec, vals, solid_bg, clr, msk, out, params):
 	# if not (lev == 7 and col == 11 and row == 97):
 	# 	return
 
 	from geo_map_util import map_tile
-	map_tile.make_tile(f, lev, col, row, pec, vals, solid_bg, clr, msk, out)
+	map_tile.make_tile(f, lev, col, row, pec, vals, solid_bg, clr, msk, out, \
+			agg=params.get('agg', None), opts=params)
 
 def main(opts):
 	import pickle
 	import os
 	from gio import config
+	import logging
 
-	with open(os.path.join(config.get('conf', 'input'), opts.tag, 'tasks.txt'), 'rb') as _fi:
+	_out = os.path.join(config.get('conf', 'input'), opts.tag)
+
+	with open(os.path.join(_out, 'tasks.txt'), 'rb') as _fi:
 		_ps = pickle.load(_fi)
 
 	from gio import multi_task
@@ -29,10 +33,20 @@ def main(opts):
 	print '%s tasks' % len(_tt)
 
 	if opts.output:
-		print 'updating output folder', opts.output
+		logging.info('updating output folder %s' % opts.output)
 		_tt = [_t[:-2] + (config.get('conf', 'output'), ) for _t in _tt]
 
-	multi_task.run(_make_tile, _tt, opts)
+	_f_ini = os.path.join(_out, 'setting.ini')
+	_met = {}
+
+	if os.path.exists(_f_ini):
+		logging.info('loading setting file: %s' % _f_ini)
+		from gio import obj
+		_met = obj.load(_f_ini)
+
+	print _met
+
+	multi_task.run(_make_tile, _tt, opts, (_met, ))
 
 def usage():
 	_p = environ_mag.usage(True)
@@ -40,7 +54,6 @@ def usage():
 	_p.add_argument('-i', '--input', dest='input')
 	_p.add_argument('-t', '--tag', dest='tag', required=True)
 	_p.add_argument('-o', '--output', dest='output')
-	_p.add_argument('-a', '--aggregate', dest='aggregate')
 
 	return _p
 

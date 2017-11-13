@@ -53,7 +53,7 @@ class tiles:
 		from gio import geo_raster as ge
 		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None):
+def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
 	# from osgeo import gdal
 	# gdal.UseExceptions()
 
@@ -78,7 +78,8 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
 
 		logging.debug('generate tile %s' % _f)
 		if percent != None:
-			band(f, lev, _eee, f_msk, solid_bg, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg)
+			band(f, lev, _eee, f_msk, solid_bg, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg, \
+					mag=opts.get('mag', None))
 		else:
 			band(f, lev, _eee, f_msk, solid_bg, _zip).make(_ext, f_clr, _f, agg=agg)
 
@@ -227,25 +228,49 @@ class band:
 
 		return _cs
 
-	def _interp_colors(self, cs, v_val, scale=100, max_val=100):
+	def _interp_colors(self, cs, v_val, scale=100):
 		if cs == None or len(cs.keys()) == 0:
 			raise Exception('no color table provided')
 
 		_c2 = cs[v_val]
+		if len(_c2) > 3:
+			_c2 = _c2[:3] + [255]
+
+		# _c1 = [255, 255, 255, 0] #cs[v_non]
+		# _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
 		_c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
 
 		if len(_c1) > 3:
 			_c1 = _c1[:3]
-		_c1 = _c1 + [255]
 
-		_ss = [(_c2[i] - _c1[i]) / float(max_val) for i in xrange(len(_c1))]
-		_cs = {0: [0, 0, 0, 0], 255: [0, 0, 0, 0]}
+		_c1 = _c1 + [80]
+
+		_ss = [(_c2[i] - _c1[i]) / float(scale) for i in xrange(len(_c1))]
+		_cs = {0: [255, 255, 255, 0]}
 
 		for i in xrange(scale):
-			# _cs[i + 1] = [int(_c1[_b] + (min(i, max_val) * _ss[_b]))  for _b in xrange(len(_c1))]
-			_cs[i + 1] = map(lambda x: max(0, min(255, x)), [int(_c1[_b] + i * _ss[_b])  for _b in xrange(len(_c1))])
+			_cs[i + 1] = [int(_c1[_b] + (i * _ss[_b]))  for _b in xrange(len(_c1))]
 			if len(_cs[i+1]) > 3:
-				_cs[i+1][-1] = max(_cs[i+1][-1], 30)
+				_cs[i+1][-1] = max(_cs[i+1][-1], 80)
+
+			# print i, _cs[i]
+
+		return _cs
+
+	def _interp_colors_t(self, cs, v_val, scale=100, mag=1):
+		if cs == None or len(cs.keys()) == 0:
+			raise Exception('no color table provided')
+
+		_c2 = cs[v_val]
+		if len(_c2) > 3:
+			_c2 = _c2[:3]
+
+		_mag = (1 if mag is None else mag)
+
+		_cs = {255: [255, 255, 255, 0]}
+		for i in xrange(scale):
+			_t = min(int(i * 2.56 * _mag), 255)
+			_cs[i] = list(_c2) + [_t]
 
 		return _cs
 
@@ -329,9 +354,7 @@ class band:
 			# bnd_inp.read_block(bnd_out.scale(zoom)).save('test_org.tif')
 			return agg_band.perc(bnd_inp.read_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
-		_agg = agg or config.get('conf', 'aggregate')
-		if _agg:
-			_agg = _agg.strip()
+		_agg = agg or config.cfg.get('conf', 'aggregate').strip()
 
 		if zoom <= 1:
 			_bnd = self.bnd[0].read_block(bnd_out)
@@ -370,7 +393,7 @@ class band:
 			# 	_bnd.data[_idx] = 10
 
 			# from gio import config
-			# if config.getboolean('conf', 'mmu'):
+			# if config.cfg.getboolean('conf', 'mmu'):
 			# 	import filter_band
 			# 	_bnd = filter_band.mmu(_bnd, 1, 1)
 
@@ -414,12 +437,12 @@ class band:
 
 		# import json
 		# json.dump(_cs, open('test_color.txt', 'w'))
-		# _bnd[0].save('test_data.tif')
+		# _bnd[0].save(f_out[:-4] + '.tif')
 		# self._save_band(_bnd, _cs, 'test_preview.png')
 
 		self._save_band(_bnd, _cs, f_out)
 
-	def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None):
+	def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None, mag=1):
 		_bnd = self._load_band(bnd, val, vals, agg=agg)
 		if _bnd is None:
 			return
@@ -427,11 +450,11 @@ class band:
 		if self.solid_bg:
 			_cs = self._interp_colors_solid_bg(self._load_color_table(f_clr), val)
 		else:
-			_cs = self._interp_colors(self._load_color_table(f_clr), val)
+			_cs = self._interp_colors_t(self._load_color_table(f_clr), val, mag=mag)
 
 		# import json
 		# json.dump(_cs, open('test_color.txt', 'w'))
-		# _bnd[0].save('test_data.tif')
+		# _bnd[0].save(f_out[:-4] + '.tif')
 		# self._save_band(_bnd, _cs, 'test_preview.png')
 
 		self._save_band(_bnd, _cs, f_out)

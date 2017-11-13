@@ -154,7 +154,7 @@ class map_obj(serv_base.service_base):
 		import re
 		_m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
 		_lev = int(_m.group(2))
-		if _lev <= 9:
+		if _lev <= 10:
 			return
 
 		_col = int(_m.group(3))
@@ -221,7 +221,7 @@ class map_obj(serv_base.service_base):
 		# _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
 		from geo_map_util import map_tile
-		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg)
+		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg, opts=_met)
 
 		logging.debug('generated tile %s' % f_inp)
 

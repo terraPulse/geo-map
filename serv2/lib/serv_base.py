@@ -44,7 +44,7 @@ class service_base:
 		_text = json.dumps(obj, default=model_data.convert_to_builtin_type,
 				indent=2, ensure_ascii=False, sort_keys=True)
 		_resp = make_response(_text)
-		_resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+		_resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
 		return _resp
 

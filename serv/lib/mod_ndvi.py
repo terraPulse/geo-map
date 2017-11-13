@@ -67,17 +67,38 @@ def yd2ymd(_yy,_dd):
 	_ymd = str(datetime.datetime.strptime(_date, '%Y%j').strftime('%Y-%m-%d'))
 	return _ymd
 
-def extract_NDVI(f_in,lon,lat,cell, f_out=None):
+def read_pt(f, pt):
+	if f.endswith('.shp'):
+		from gio import geo_raster_ex as gx
+		_val = gx.geo_band_stack_zip.from_shapefile(f).read(pt)
+		return _val
+	else:
+		from gio import geo_raster as ge
+		_bnd = ge.open(f).get_band()
+		_pt = pt.project_to(_bnd.proj)
+
+		return _bnd.read_location(_pt.x, _pt.y)
+
+def extract_NDVI(f_in, lon, lat, cell, tag=None, f_out=None):
 	from gio import geo_raster_ex as gx
 	from gio import config
 	import logging
 
 	_ext, _row, _col,_tile, _pt = identify_loc(lon, lat)
-	_wat = gx.geo_band_stack_zip.from_shapefile(config.get('general', 'water_path')).read(_pt)
 
+	_wat = gx.geo_band_stack_zip.from_shapefile(config.get('general', 'water_path')).read(_pt)
 	if _wat != 0:
 		logging.warning('water pixel %s, %s' % (lon, lat))
 		return {'ext': _ext.poly.ExportToJson(), 'data': []}
+
+	if tag:
+		_path = config.get('mask', tag)
+		print 'tag', tag, _path
+		if _path:
+			_val = read_pt(_path, _pt)
+			if _val != 1:
+				logging.warning('masked pixel %s, %s' % (lon, lat))
+				return {'ext': _ext.poly.ExportToJson(), 'data': []}
 
 	_rr = _row % cell
 	_cc = _col % cell

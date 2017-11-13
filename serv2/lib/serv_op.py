@@ -68,6 +68,16 @@ class op(serv_base.service_base):
 			return self._ndvi(_x, _y, self.pp('frm', None))
 			# return self._ndvi_chart(_x, _y)
 
+		if path == 'ndvi_p':
+			_x = self.pf('x')
+			_y = self.pf('y')
+
+			import requests
+			# _json = requests.get('http://terrapulse.com:8080/_ndvi?x=%s&y=%s' % (_x, _y))
+			_json = requests.get('http://52.54.49.254:8080/_ndvi?x=%s&y=%s' % (_x, _y))
+
+			return self.output_json(_json.json())
+
 		if path == 'tile':
 			_x = self.pf('x')
 			_y = self.pf('y')

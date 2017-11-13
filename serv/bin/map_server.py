@@ -43,8 +43,8 @@ def get_ip_address():
 def main(opts):
 	_routes = [
 			(r'/_(.+)', 'geo_map_serv.serv_op.op'),
+			(r'/app/(.+)', 'geo_map_serv.serv_web.web_app'),
 			(r'/map/(.+)', 'geo_map_serv.serv_web.map_obj'),
-			# (r'/web/(.+)', 'serv_web.web'),
 			(r'/?([^_].*)', 'geo_map_serv.serv_web.web'),
 			]
 
