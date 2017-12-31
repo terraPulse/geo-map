@@ -197,6 +197,9 @@ class map_obj(serv_base.service_base):
 		_out = os.path.join(config.get('general', 'map_path'), _tag)
 		_inp = None
 		_agg = None
+		_valid_vals = None
+		_solid_bg = False
+		_mask = None
 
 		if config.cfg.has_section(_tag):
 			_inp = config.get(_tag, 'file', '')
@@ -211,19 +214,22 @@ class map_obj(serv_base.service_base):
 				_inp = _met.get('file')
 				_pec = _met.getint('percent')
 				_clr = _met.get('color')
+				_solid_bg = _met.get('solid_bg')
 				_agg = _met.get('agg')
+
+				_valid_vals = _met.get('valid_vals')
+				_mask = _met.get('mask')
 
 		if _inp is None:
 			return
 
 		if _clr is None:
 			_clr = os.path.join(_out, 'color.txt')
-        #
-		# _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
 		from geo_map_util import map_tile
-		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _clr, _out, agg=_agg, opts=_met)
-		logging.info('generated tile %s' % f_inp)
+		map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg, opts=_met)
+
+		logging.debug('generated tile %s' % f_inp)
 
 	def _format_path(self, p):
 		if p.startswith('/a/'):
