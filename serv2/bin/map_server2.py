@@ -70,6 +70,10 @@ def op(path):
 		logging.error(str(err))
 
 		print '\n\n* Error:', err
+		raise err
+
+	if _r is None:
+		raise Exception('failed to process the request')
 
 	_r.headers["Cache-Control"] = 'no-cache, no-store, must-revalidate'
 	_r.headers["Pragma"] = "no-cache"
@@ -88,8 +92,8 @@ def main(opts):
 
 	_app = Flask(__name__)
 
-	_app.add_url_rule('/', 'index', op, defaults={'path': ''})
-	_app.add_url_rule('/<path:path>', 'index', op)
+	_app.add_url_rule('/', 'index', op, defaults={'path': ''}, methods=["GET", "POST", "PUT"])
+	_app.add_url_rule('/<path:path>', 'index', op, methods=["GET", "POST", "PUT"])
 	_app.register_error_handler(404, not_found)
 
 	if config.getboolean('conf', 'debug', False) == False:
