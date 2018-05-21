@@ -2,10 +2,15 @@
 import logging
 import webapp2
 
-class service_base(webapp2.RequestHandler):
+class service_base:
+	def __init__(self, request):
+		self.request = request
 
 	def pp(self, tag, d=None):
-		_t = self.request.get(tag)
+		if tag not in self.request.values:
+			raise Exception('not found parameter %s' % tag)
+
+		_t = self.request.values[tag]
 		return _t.strip() if (_t != None and _t.strip()) else d
 
 	def pf(self, tag, d=None):
@@ -13,52 +18,56 @@ class service_base(webapp2.RequestHandler):
 		return d if _t == None else float(_t)
 
 	def get(self, *arg):
-		logging.info('GET request')
 		return self.__task(*arg)
 
 	def post(self, *arg):
-		logging.info('POST request')
 		return self.__task(*arg)
 
 	def __task(self, *arg):
-		self.task(*arg)
+		return self.task(*arg)
 
 	def task(self, *arg):
 		raise NotImplementedError()
 
 	def output_html(self, txt):
-		self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
-		self.response.out.write(txt)
+		from flask import make_response
+		_resp = make_response(txt)
+		_resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+
+		return _resp
 
 	def output_json(self, obj):
 		import json
 		import model_data
 
-		self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-		json.dump(obj, self.response.out, default=model_data.convert_to_builtin_type,
+		from flask import make_response
+		_text = json.dumps(obj, default=model_data.convert_to_builtin_type,
 				indent=2, ensure_ascii=False, sort_keys=True)
+		_resp = make_response(_text)
+		_resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
+
+		return _resp
 
 	def output_file(self, f, attachment=False):
-		with open(f, 'rb') as _fi:
-			return self.output_byte(f, _fi.read(), attachment)
+		import flask
+		return flask.send_file(f, as_attachment=attachment)
 
 	def output_byte(self, f, b, attachment=False):
+		from flask import make_response
 		import mimetypes
 		import os
+
+		_resp = make_response(b)
 
 		_context = mimetypes.guess_type(f)[0]
 		if _context is None:
 			_context = 'application/octet-stream'
 
-		self.response.headers['Content-Type'] = _context
-		# _type = 'inline' if 'image' in _context else 'attachment'
+		_resp.headers['Content-Type'] = _context
 		_type = 'inline' if (not attachment) else 'attachment'
-		self.response.headers['Content-Disposition'] = '%s; filename=%s' % (_type, os.path.basename(f))
+		_resp.headers['Content-Disposition'] = '%s; filename=%s' % (_type, os.path.basename(f))
 
-		logging.info('context-type:' + _context)
-		logging.info('loading web file: ' + f)
-
-		self.response.out.write(b)
+		return _resp
 
 	def handle_exception(self, exception, debug):
 		import traceback
@@ -69,12 +78,11 @@ class service_base(webapp2.RequestHandler):
 
 		_json = {'message': str(exception.message)}
 		if isinstance(exception, webapp2.HTTPException):
-			self.response.set_status(exception.code)
+
 			_json['code'] = exception.code
 		else:
 			self.response.set_status(500)
 			_json['code'] = 500
 
-		self.output_json({'error': _json})
-
+		return self.output_json({'error': _json})
 

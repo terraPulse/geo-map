@@ -12,288 +12,306 @@ Description: make tiling tasks
 import logging
 
 def format_path(p):
-	if p.startswith('/a/'):
-		return '/'.join([''] + p.split('/')[3:])
+    if p.startswith('/a/'):
+        return '/'.join([''] + p.split('/')[3:])
 
-	return p
+    return p
 
 def load_shp(f):
-	from osgeo import ogr
-	from gio import geo_base as gb
+    from osgeo import ogr
+    from gio import geo_base as gb
 
-	_shp = ogr.Open(f)
-	if _shp is None:
-		raise Exception('Failed to load shapefile ' + f)
+    _shp = ogr.Open(f)
+    if _shp is None:
+        raise Exception('Failed to load shapefile ' + f)
 
-	_lyr = _shp.GetLayer()
-	_objs = []
-	_area = None
+    _lyr = _shp.GetLayer()
+    _objs = []
+    _area = None
 
-	for _f in _lyr:
-		_obj = gb.geo_polygon(_f.geometry().Clone())
-		_ext = _obj.extent()
+    for _f in _lyr:
+        _obj = gb.geo_polygon(_f.geometry().Clone())
+        _ext = _obj.extent()
 
-		_objs.append(_obj)
-		if _area is None:
-			_area = _ext
-		else:
-			_area = _area.union(_ext)
+        _objs.append(_obj)
+        if _area is None:
+            _area = _ext
+        else:
+            _area = _area.union(_ext)
 
-	from gio import geo_raster as ge
-	_prj = ge.proj_from_epsg(3857)
+    from gio import geo_raster as ge
+    _prj = ge.proj_from_epsg(3857)
 
-	_reg = _area.to_polygon().segment_ratio(30).project_to(_prj)
-	return _reg.extent()
+    _reg = _area.to_polygon().segment_ratio(30).project_to(_prj)
+    return _reg.extent()
 
 def load_img(f, fzip):
-	from gio import geo_raster as ge
+    from gio import geo_raster as ge
 
-	_prj = ge.proj_from_epsg(3857)
-	_reg = ge.open(fzip.unzip(f)).extent().to_polygon().segment_ratio(30).project_to(_prj)
+    _prj = ge.proj_from_epsg(3857)
+    _reg = ge.open(fzip.unzip(f)).extent().to_polygon().segment_ratio(30).project_to(_prj)
 
-	return _reg.extent()
+    return _reg.extent()
 
 class color_table:
 
-	def __init__(self, c):
-		self._cs = self._color_table(c)
+    def __init__(self, cs):
+        self._cs = cs
 
-	@staticmethod
-	def load(f, fzip):
-		import os
+    @staticmethod
+    def load(f, fzip):
+        import os
 
-		_ext = os.path.splitext(f.lower())[1]
+        _ext = os.path.splitext(f.lower())[1]
 
-		_f = f
-		if _ext == '.shp':
-			_f = color_table.load_sample(f)
+        _f = f
+        if _ext == '.shp':
+            _f = color_table.load_sample(f)
 
-		from gio import geo_raster as ge
-		_b = ge.open(fzip.unzip(_f)).get_band()
+        from gio import geo_raster as ge
+        _b = ge.open(fzip.unzip(_f)).get_band()
 
-		if _b.color_table is None:
-			return None
-		else:
-			return color_table(_b.color_table)
+        if _b.color_table is None:
+            return None
+        else:
+            return color_table(color_table._color_table(_b.color_table))
 
-	def _color_table(self, c):
-		_cs = {}
-		if c is None:
-			return None
+    @staticmethod
+    def _color_table(c):
+        _cs = {}
+        if c is None:
+            return None
 
-		_rg = lambda x: min(max(0, x), 255)
+        _rg = lambda x: min(max(0, x), 255)
 
-		_c = c
-		for i in xrange(_c.GetCount()):
-			try:
-				_v = _c.GetColorEntry(i)
-			except:
-				_v = _rg
+        _c = c
+        for i in xrange(_c.GetCount()):
+            try:
+                _v = _c.GetColorEntry(i)
+            except:
+                _v = _rg
 
-			if len(_v) == 3:
-				_v = list(_v) + [255]
+            if len(_v) == 3:
+                _v = list(_v) + [255]
 
-			_cs[i] = map(_rg, _v)
+            _cs[i] = map(_rg, _v)
 
-		return _cs
+        return _cs
 
-	def save(self, f):
-		_ls = []
-		for _k, _v in self._cs.items():
-			_ls.append('%s %s' % (_k, ','.join(map(str, _v))))
+    def save(self, f):
+        _ls = []
+        for _k, _v in self._cs.items():
+            _ls.append('%s %s' % (_k, ','.join(map(str, _v))))
 
-		with open(f, 'w') as _fo:
-			_fo.write('\n'.join(_ls))
+        with open(f, 'w') as _fo:
+            _fo.write('\n'.join(_ls))
 
-		return f
+        return f
 
-	@staticmethod
-	def load_sample(f):
-		from osgeo import ogr
+    @staticmethod
+    def load_sample(f):
+        from osgeo import ogr
 
-		_shp = ogr.Open(f)
-		if _shp is None:
-			raise Exception('Failed to load shapefile ' + f)
+        _shp = ogr.Open(f)
+        if _shp is None:
+            raise Exception('Failed to load shapefile ' + f)
 
-		_lyr = _shp.GetLayer()
-		for _f in _lyr:
-			return _f.items()['FILE']
+        _lyr = _shp.GetLayer()
+        for _f in _lyr:
+            return _f.items()['FILE']
 
-		raise None
+        raise None
 
 class tiles:
 
-	def __init__(self):
-		import math
-		from gio import geo_raster as ge
+    def __init__(self):
+        import math
+        from gio import geo_raster as ge
 
-		self.b = 6378137.0
-		self.s = 256
-		self.p = self.b * math.pi
+        self.b = 6378137.0
+        self.s = 256
+        self.p = self.b * math.pi
 
-		self.prj = ge.proj_from_epsg(3857)
+        self.prj = ge.proj_from_epsg(3857)
 
-	def list(self, level, ext=None):
-		from gio import geo_base as gb
+    def list(self, level, ext=None):
+        from gio import geo_base as gb
 
-		_r = (2 * self.p) / (2 ** level)
+        _r = (2 * self.p) / (2 ** level)
 
-		_rows = 2 ** level
-		_cols = 2 ** level
+        _rows = 2 ** level
+        _cols = 2 ** level
 
-		_num = -1
-		for _row in xrange(_rows):
-			for _col in xrange(_cols):
-				_num += 1
+        _num = -1
+        for _row in xrange(_rows):
+            for _col in xrange(_cols):
+                _num += 1
 
-				_x = -self.p + (_col * _r)
-				_y = -self.p + (_row * _r)
+                _x = -self.p + (_col * _r)
+                _y = -self.p + (_row * _r)
 
-				_ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
-				if ext is None or _ext.is_intersect(ext):
-					yield level, _num, _col, _row
+                _ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
+                if ext is None or _ext.is_intersect(ext):
+                    yield level, _num, _col, _row
 
-	def cell(self, level):
-		_r = (2 * self.p) / (2 ** level)
-		return _r / self.s
+    def cell(self, level):
+        _r = (2 * self.p) / (2 ** level)
+        return _r / self.s
 
-	def extent(self, level, col, row):
-		_r = (2 * self.p) / (2 ** level)
-		_c = _r / self.s
+    def extent(self, level, col, row):
+        _r = (2 * self.p) / (2 ** level)
+        _c = _r / self.s
 
-		_x = -self.p + (col * _r)
-		_y = -self.p + (row * _r)
+        _x = -self.p + (col * _r)
+        _y = -self.p + (row * _r)
 
-		_geo = [_x, _c, 0, _y + _r, 0, -_c]
+        _geo = [_x, _c, 0, _y + _r, 0, -_c]
 
-		from gio import geo_raster as ge
-		return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
+        from gio import geo_raster as ge
+        return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make(f_inp, f_clr, levels, title, percent, valid_vals, agg, d_out, fzip, opts):
-	import os
+def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, fzip, opts):
+    import os
+    from gio import file_mag
 
-	# detect the extent of input file
-	_ext = load_shp(f_inp) if f_inp.endswith('.shp') else load_img(f_inp, fzip)
-	logging.info('detected extent %s' % str(_ext))
-	print 'detected extent', _ext
+    _f = file_mag.get(f_inp).get()
 
-	_f_clr = os.path.join(d_out, 'color.txt')
-	if not f_clr:
-		logging.info('load color table from the input data')
-		_f_clr = color_table.load(f_inp, fzip).save(_f_clr)
-		print 'loading color table', _f_clr
-	else:
-		import shutil
-		shutil.copy(f_clr, _f_clr)
+    # detect the extent of input file
+    _ext = load_shp(_f) if f_inp.endswith('.shp') else load_img(_f, fzip)
+    logging.info('detected extent %s' % str(_ext))
+    print 'detected extent', _ext
 
-	if not _f_clr:
-		raise Exception('failed to find color table')
+    _f_clr = os.path.join(d_out, 'color.txt')
+    if not f_clr:
+        logging.info('load color table from the input data')
+        if f_tclr:
+            from geo_map_util import map_color
+            _f_clr = color_table(map_color.load_color_file(f_tclr)[1]).save(_f_clr)
+        else:
+            _f_clr = color_table.load(_f, fzip).save(_f_clr)
 
-	_tiles = tiles()
+        print 'loading color table', _f_clr
+    else:
+        import shutil
+        shutil.copy(f_clr, _f_clr)
 
-	_ps = []
-	print opts.mask
-	for _lev in xrange(levels[0], levels[1]+1):
-		print ' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev)
-		for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
-			_ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
-					_f_clr, opts.mask, d_out))
+    if not _f_clr:
+        raise Exception('failed to find color table')
 
-	logging.info('found %s task' % len(_ps))
-	print 'found %s tasks' % len(_ps)
+    _tiles = tiles()
 
-	# print 'write map.html'
-	# from gio import geo_raster as ge
-	# _ext_geo = _ext.to_polygon().segment_ratio(30).project_to(ge.proj_from_epsg()).extent()
+    _ps = []
+    print opts.mask
+    for _lev in xrange(levels[0], levels[1]+1):
+        print ' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev)
+        for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
+            _ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
+                    _f_clr, opts.mask, d_out))
 
-	# _f_out = os.path.join(d_out, 'map.html')
-	# with open(config.cfg.get('conf', 'openlayers_temp'), 'r') as _fi, open(_f_out, 'w') as _fo:
-	# 	_fo.write(_fi.read() % {
-	# 			'title': os.path.basename(f_inp),
-	# 			'xmin': _ext_geo.minx, 'xmax': _ext_geo.maxx,
-	# 			'ymin': _ext_geo.miny, 'ymax': _ext_geo.maxy,
-	# 			'zmin': levels[0], 'zmax': levels[1]
-	# 			})
+    logging.info('found %s task' % len(_ps))
+    print 'found %s tasks' % len(_ps)
 
-	print 'write to', os.path.join(d_out, 'tasks.txt')
-	with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
-		import pickle
-		pickle.dump(_ps, _fo)
+    # print 'write map.html'
+    # from gio import geo_raster as ge
+    # _ext_geo = _ext.to_polygon().segment_ratio(30).project_to(ge.proj_from_epsg()).extent()
 
-	from gio import obj
-	_obj = obj.obj()
+    # _f_out = os.path.join(d_out, 'map.html')
+    # with open(config.cfg.get('conf', 'openlayers_temp'), 'r') as _fi, open(_f_out, 'w') as _fo:
+    #     _fo.write(_fi.read() % {
+    #             'title': os.path.basename(f_inp),
+    #             'xmin': _ext_geo.minx, 'xmax': _ext_geo.maxx,
+    #             'ymin': _ext_geo.miny, 'ymax': _ext_geo.maxy,
+    #             'zmin': levels[0], 'zmax': levels[1]
+    #             })
 
-	_obj.file = f_inp
-	if percent is not None:
-		_obj.percent = percent
-	if title:
-		_obj.title = title
+    print 'write to', os.path.join(d_out, 'tasks.txt')
+    with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
+        import pickle
+        pickle.dump(_ps, _fo)
 
-	if valid_vals:
-		_obj.valid_vals = valid_vals
+    from gio import obj
+    _obj = obj.obj()
 
-	if opts.mask:
-		_obj.mask = opts.mask
+    _obj.file = f_inp
+    if percent is not None:
+        _obj.percent = percent
+    if title:
+        _obj.title = title
 
-	if opts.solid_bg:
-		_obj.solid_bg = True
+    if valid_vals:
+        _obj.valid_vals = valid_vals
 
-	_obj.visible = True
+    if opts.mask:
+        _obj.mask = opts.mask
 
-	if agg:
-		_obj.agg = agg
+    if opts.solid_bg:
+        _obj.solid_bg = True
 
-	_obj.save(os.path.join(d_out, 'setting.ini'))
+    _obj.visible = True
+
+    if agg:
+        _obj.agg = agg
+
+    if f_tclr:
+        _obj.translate_color = os.path.abspath(f_tclr)
+
+    _obj.save(os.path.join(d_out, 'setting.ini'))
 
 def main(opts):
-	from osgeo import gdal
-	gdal.UseExceptions()
+    from osgeo import gdal
+    gdal.UseExceptions()
 
-	from gio import config
+    from gio import config
 
-	import os
-	_d_out = format_path(os.path.abspath(os.path.join(config.get('conf', 'output'), opts.tag)))
-	os.path.exists(_d_out) or os.makedirs(_d_out)
+    import os
+    _d_out = format_path(os.path.abspath(os.path.join(config.get('conf', 'output'), opts.tag)))
+    os.path.exists(_d_out) or os.makedirs(_d_out)
 
-	from gio import file_unzip
-	with file_unzip.file_unzip() as _zip:
-		make(format_path(os.path.abspath(config.get('conf', 'input'))), config.get('conf', 'color'), \
-				opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_out, _zip, opts)
+    from gio import file_unzip
+    with file_unzip.file_unzip() as _zip:
+        _f_inp = config.get('conf', 'input')
+        if not _f_inp.startswith('s3://'):
+            _f_inp = os.path.abspath(_f_inp)
 
-	if opts.execute:
-		print 'generate map tiles'
+        make(format_path(_f_inp), config.get('conf', 'color'), config.get('conf', 'translate_color'), \
+                opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_out, _zip, opts)
 
-		_cmd = 'build_tiles_task.py -t %s ' % opts.tag
-		_agg = ' -a %s ' % opts.agg if opts.agg else ''
-		_tsk = '-in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
-				opts.instance_num, opts.instance_pos, opts.task_num, \
-						'-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
+    if opts.execute:
+        print 'generate map tiles'
 
-		from gio import run_commands
-		run_commands.run(_cmd + _agg + _tsk)
+        _cmd = 'build_tiles_task.py -t %s ' % opts.tag
+        # _agg = ' -a %s ' % opts.agg if opts.agg else ''
+        _tsk = '-in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
+                opts.instance_num, opts.instance_pos, opts.task_num, \
+                        '-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
+
+        from gio import run_commands
+        # run_commands.run(_cmd + _agg + _tsk)
+        run_commands.run(_cmd + _tsk)
 
 def usage():
-	_p = environ_mag.usage(True)
+    _p = environ_mag.usage(True)
 
-	_p.add_argument('-i', '--input', dest='input', required=True)
-	_p.add_argument('-o', '--output', dest='output')
-	_p.add_argument('-c', '--color', dest='color')
-	_p.add_argument('-t', '--tag', dest='tag', required=True)
-	_p.add_argument('-a', '--agg', dest='agg')
-	_p.add_argument('--title', dest='title')
-	_p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
-	_p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
-	_p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
-	_p.add_argument('-m', '--mask', dest='mask')
-	_p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
+    _p.add_argument('-i', '--input', dest='input', required=True)
+    _p.add_argument('-o', '--output', dest='output')
+    _p.add_argument('-c', '--color', dest='color')
+    _p.add_argument('--translate-color', dest='translate_color')
+    _p.add_argument('-t', '--tag', dest='tag', required=True)
+    _p.add_argument('-a', '--agg', dest='agg')
+    _p.add_argument('--title', dest='title')
+    _p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
+    _p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
+    _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
+    _p.add_argument('-m', '--mask', dest='mask')
+    _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
 
-	_p.add_argument('-e', '--execute', dest='execute', action='store_true', \
-		help='run build_tiles_task.py after the map task is generated')
+    _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
+        help='run build_tiles_task.py after the map task is generated')
 
-	return _p
+    return _p
 
 if __name__ == '__main__':
-	from gio import environ_mag
-	environ_mag.init_path()
-	environ_mag.run(main, [environ_mag.config(usage())])
+    from gio import environ_mag
+    environ_mag.init_path()
+    environ_mag.run(main, [environ_mag.config(usage())])
 

@@ -8,11 +8,8 @@ _tods = []
 
 class web(serv_base.service_base):
 
-	def __init__(self, request, response):
-		from gio import config
-
-		self._d_web = config.get_at('general', 'web_path')
-		serv_base.service_base.__init__(self, request, response)
+	def __init__(self, request):
+		serv_base.service_base.__init__(self, request)
 
 	def _add_maps(self, f, fzip):
 		from gio import config
@@ -23,6 +20,7 @@ class web(serv_base.service_base):
 		_fs = []
 		for _d in sorted(os.listdir(_d_map)):
 			_f = os.path.join(_d_map, _d, 'setting.ini')
+			logging.info('loading %s' % _f)
 			if os.path.exists(_f):
 				_obj = obj.load(_f)
 
@@ -48,16 +46,20 @@ class web(serv_base.service_base):
 	def task(self, path):
 		import os
 		import re
+		from gio import config
 		from gio import file_unzip
 
 		_path = path
 		if _path == '' or _path == '/':
 			_path  = 'index.html'
 
-		_f_res = os.path.join(self._d_web, _path)
+		_d_web = config.get_at('general', 'web_path')
+		_f_res = os.path.join(_d_web, _path)
 
 		if not os.path.exists(_f_res):
-			raise Exception('no file found %s' % _f_res)
+			logging.error('no file found %s' % _f_res)
+			return
+			# raise Exception('no file found %s' % _f_res)
 
 		logging.info('loading web path: ' + path)
 		if re.search('js/map.*\.js', _f_res):
@@ -65,14 +67,6 @@ class web(serv_base.service_base):
 				return self.output_file(self._add_maps(_f_res, _zip))
 
 		return self.output_file(_f_res)
-
-class web_app(web):
-
-	def __init__(self, request, response):
-		from gio import config
-
-		web.__init__(self, request, response)
-		self._d_web = config.get_at('general', 'app_path')
 
 _zips = {}
 
@@ -102,8 +96,8 @@ def load_zips(load=False):
 
 class map_obj(serv_base.service_base):
 
-	def __init__(self, request, response):
-		serv_base.service_base.__init__(self, request, response)
+	def __init__(self, request):
+		serv_base.service_base.__init__(self, request)
 
 	def _dmap_mag(self, f, f_out):
 		from gio import config
@@ -162,7 +156,7 @@ class map_obj(serv_base.service_base):
 		import re
 		_m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
 		_lev = int(_m.group(2))
-		if _lev < 10:
+		if _lev <= 10:
 			return
 
 		_col = int(_m.group(3))
@@ -278,19 +272,19 @@ class map_obj(serv_base.service_base):
 
 			return self.output_file(_f)
 
-		_zips = load_zips()
-		if _p not in _zips.keys():
-			if os.path.exists(os.path.join(_d_web, _p + '.zip')):
-				_zips = load_zips(True)
+		# _zips = load_zips()
+		# if _p not in _zips.keys():
+		# 	if os.path.exists(os.path.join(_d_web, _p + '.zip')):
+		# 		_zips = load_zips(True)
 
-		if _p in _zips:
-			_r = _zips[_p].load(_v)
-			if _r == None:
-				if _v.endswith('.png'):
-					return self.output_file(config.get_at('general', 'nodata_file'))
-				raise Exception('failed to find page %s' % path)
-			else:
-				return self.output_byte(path, _r)
+		# if _p in _zips:
+		# 	_r = _zips[_p].load(_v)
+		# 	if _r == None:
+		# 		if _v.endswith('.png'):
+		# 			return self.output_file(config.get_at('general', 'nodata_file'))
+		# 		raise Exception('failed to find page %s' % path)
+		# 	else:
+		# 		return self.output_byte(path, _r)
 
 		raise Exception('no module found %s' % _p)
 

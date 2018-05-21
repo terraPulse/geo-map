@@ -11,26 +11,10 @@ import logging
 
 class op(serv_base.service_base):
 
-	def __init__(self, request, response):
-		serv_base.service_base.__init__(self, request, response)
+	def __init__(self, request):
+		serv_base.service_base.__init__(self, request)
 
-	def _ndvi_poly(self, fid):
-		import re
-		_m = re.match('(.+)_(\d+)', fid)
-		if _m is None:
-			raise Exception('failed to parse requested ID (%s)' % fid)
-
-		from gio import config
-		import os
-
-		_d_out = config.get('conf', 'path_ndvi_poly', '/data/mfeng/data/ndvi/region/extract/data')
-		_f_out = os.path.join(_d_out, _m.group(1).lower(), '%s.txt' % str(int(_m.group(2))))
-
-		with open(_f_out) as _fi:
-			import json
-			self.output_json(json.load(_fi))
-
-	def _ndvi(self, x, y, frm=None, tag=None):
+	def _ndvi(self, x, y, frm=None):
 		import mod_ndvi
 		from gio import file_unzip
 		from gio import config
@@ -39,20 +23,11 @@ class op(serv_base.service_base):
 
 		with file_unzip.file_unzip() as _zip:
 			_f_tmp  = _zip.generate_file('', '.csv') if frm == 'csv' else None
-			_rs = mod_ndvi.extract_NDVI(_l, x, y, 600, tag, _f_tmp)
+			_rs = mod_ndvi.extract_NDVI(_l, x, y, 600, _f_tmp)
 			if _f_tmp:
-				self.output_file(_f_tmp)
+				return self.output_file(_f_tmp)
 			else:
-				self.output_json(_rs)
-
-	def _viewshed(self, x, y, frm=None):
-		from gio import config
-
-		_l = config.get('general', 'dem_path', '/data2/data/dem/srtm/list/srtm_30m.shp')
-
-		from viewshed import lib_viewshed
-		self.output_json(lib_viewshed.viewshed_region(_l, x, y, max_dist=self.pf('max_dist', 30000), \
-				cell=self.pf('cell', 90), elevation=self.pf('elevation', 3.0)))
+				return self.output_json(_rs)
 
 	def _ndvi_chart(self, x, y):
 		from gio import file_unzip
@@ -77,30 +52,31 @@ class op(serv_base.service_base):
 
 	def _wrs_tile(self, x, y):
 		import identify_tile
-		self.output_json(identify_tile.tile(x, y))
+		return self.output_json(identify_tile.tile(x, y))
 
 	def _pixel(self, x, y):
 		import identify_pixel
 		_vals = identify_pixel.pixels(x, y)
 
-		self.output_json(''.join(['<div><b>%s:</b> %s</div>' % (_k, _vals[_k]) for _k in sorted(_vals.keys())]))
+		return self.output_json(''.join(['<div><b>%s:</b> %s</div>' % (_k, _vals[_k]) for _k in sorted(_vals.keys())]))
 
 	def task(self, path):
 		if path == 'ndvi':
 			_x = self.pf('x')
 			_y = self.pf('y')
 
-			return self._ndvi(_x, _y, self.pp('frm', None), self.pp('tag', None))
+			return self._ndvi(_x, _y, self.pp('frm', None))
 			# return self._ndvi_chart(_x, _y)
 
-		if path == 'viewshed':
+		if path == 'ndvi_p':
 			_x = self.pf('x')
 			_y = self.pf('y')
 
-			return self._viewshed(_x, _y)
+			import requests
+			# _json = requests.get('http://terrapulse.com:8080/_ndvi?x=%s&y=%s' % (_x, _y))
+			_json = requests.get('http://52.54.49.254:8080/_ndvi?x=%s&y=%s' % (_x, _y))
 
-		if path == 'ndvi_poly':
-			return self._ndvi_poly(self.pp('id'))
+			return self.output_json(_json.json())
 
 		if path == 'tile':
 			_x = self.pf('x')
@@ -120,7 +96,7 @@ class op(serv_base.service_base):
 
 			from gio import config
 			if _user == config.get('conf', 'user', 'global') and _pass == config.get('conf', 'password', 'global'):
-				self.output_json({'user_name': _user, 'real_name': 'Test'})
+				return self.output_json({'user_name': _user, 'real_name': 'Test'})
 			else:
 				raise Exception('authorization failed')
 
