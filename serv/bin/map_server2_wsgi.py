@@ -36,6 +36,7 @@ def main(opts):
 
     _ssl_key = config.get('conf', 'ssl_key')
     _ssl_crt = config.get('conf', 'ssl_crt')
+    _kernal = config.get('conf', 'kernal')
 
     _con = None
     if _ssl_key or _ssl_crt:
@@ -60,7 +61,9 @@ def main(opts):
     _ps.append('--access-logfile=%s' % _f_log)
     _ps.append('--error-logfile=%s' % _f_log_err)
     # _ps.append('--max-requests=10')
-    _ps.append('-k gevent')
+
+    if _kernal:
+        _ps.append('-k ' + _kernal)
 
     import os
     from gio import logging_util
