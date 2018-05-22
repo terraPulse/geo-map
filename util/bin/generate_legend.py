@@ -33,27 +33,38 @@ def main(opts):
     _f_clr = opts.input
     _vs, _cs = map_color.load_color_file(_f_clr)
 
-    _rows = 180
-    _img = PIL.Image.new('RGBA', (81, _rows), (255, 255, 255, 0))
+    _height = 200
+    _buf = 6
+    _rows = _height - (2 * _buf)
+
+    _img = PIL.Image.new('RGBA', (81, _height), (255, 255, 255, 0 if opts.transparent_bg else 255))
 
     for _row in xrange(0, _rows):
         for _col in xrange(0, 10):
             _rrr = min(_rows - 1, int((_row * len(_vs)) /_rows))
             _clr = _cs[_rrr]
 
-            _img.putpixel((_col, _row), _clr)
+            _img.putpixel((_col, _buf + _row), _clr)
+
+    _font_size = 12
+    _font_offset = -1 * (_font_size / 2 + 1) #_font_size / 2 - 2
 
     import PIL.ImageDraw
     import PIL.ImageFont
     from gio import config
 
-    _fnt = PIL.ImageFont.truetype(config.get('conf', 'font'), 12)
+    _fnt = PIL.ImageFont.truetype(config.get('conf', 'font'), _font_size)
     _dra = PIL.ImageDraw.Draw(_img)
 
     _txt = lambda x: opts.format % x
-    _dra.text((12, 1), _txt(_vs[0].v), font=_fnt, fill=(0, 0, 0, 255))
-    _dra.text((12, _rows / 2 - 14), _txt(_vs[len(_vs) / 2].v), font=_fnt, fill=(0, 0, 0, 255))
-    _dra.text((12, _rows - 14), _txt(_vs[-2].v), font=_fnt, fill=(0, 0, 0, 255))
+    _num = min(len(_vs), opts.ticks)
+
+    for _i in xrange(_num):
+        _pos = _i * 1.0 / _num
+        _dra.text((13, int(_rows * _pos + _buf + _font_offset)), \
+                _txt(_vs[int(len(_vs) * _pos)].v), font=_fnt, fill=(0, 0, 0, 255))
+
+    _dra.text((13, _rows + _buf + _font_offset), _txt(_vs[-1].v), font=_fnt, fill=(0, 0, 0, 255))
 
     _img.save(opts.output)
 
@@ -63,6 +74,8 @@ def usage():
     _p.add_argument('-i', '--input', dest='input', required=True)
     _p.add_argument('-f', '--format', dest='format', default='%0.0f')
     _p.add_argument('-o', '--output', dest='output', required=True)
+    _p.add_argument('-t', '--ticks', dest='ticks', type=int, default=6)
+    _p.add_argument('-b', '--transparent-bg', dest='transparent_bg', action='store_true', default=False)
 
     return _p
 
