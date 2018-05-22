@@ -157,6 +157,9 @@ class map_obj(serv_base.service_base):
 
         import re
         _m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
+        if not _m:
+            return
+
         _lev = int(_m.group(2))
         if _lev < self.min_level:
             logging.warning('skip level %s < %s' % (_lev, self.min_level))
@@ -264,6 +267,9 @@ class map_obj(serv_base.service_base):
             _f = self._format_path(os.path.join(_d_web, path))
 
             if not os.path.exists(_f):
+                if not _f.endswith('.png'):
+                    raise Exception('failed to find %s' % path)
+
                 # if self.pp('cache') == '1':
                 logging.info('generating map tile (%s)' % _f)
 
