@@ -70,6 +70,7 @@ def main(opts):
 
     _f_log_eee = logging_util.find_log()[:-9] + '_in.log'
     os.environ['G_LOG_S'] = _f_log_eee
+    logging.info('log_s: %s' % _f_log_eee)
 
     # os.environ['G_INI_S'] = config.find_log()':-9' + '.ini'
 

@@ -97,7 +97,10 @@ def load_zips(load=False):
 class map_obj(serv_base.service_base):
 
     def __init__(self, request):
+        from gio import config
+
         serv_base.service_base.__init__(self, request)
+        self.min_level = config.getint('conf', 'min_level', 9)
 
     def _dmap_mag(self, f, f_out):
         from gio import config
@@ -148,23 +151,22 @@ class map_obj(serv_base.service_base):
         # print 'done', _c
 
     def _dmap_mag_single(self, f, f_out):
-        from gio import config
-
-        if len(_jobs) > 10 or f in _jobs:
-            logging.warning('exceed 10 tasks (%s)' % len(_jobs))
-            return
-            # return _tods.append(f)
+        # if len(_jobs) > 10 or f in _jobs:
+        #     logging.warning('exceed 10 tasks (%s)' % len(_jobs))
+        #     return
 
         import re
         _m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
         _lev = int(_m.group(2))
-        if _lev < config.getint('conf', 'min_level', 9):
+        if _lev < self.min_level:
+            logging.warning('skip level %s < %s' % (_lev, self.min_level))
             return
+
+        # _jobs.append(f)
 
         _col = int(_m.group(3))
         _row = int(_m.group(4))
 
-        _jobs.append(f)
         print '+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row)
 
         try:
@@ -172,8 +174,9 @@ class map_obj(serv_base.service_base):
             # import time
             # time.sleep(2.0)
         finally:
-            print '-', len(_jobs)
-            _jobs.pop()
+            pass
+            # print '-', len(_jobs)
+            # _jobs.pop()
 
     def _dmap_single(self, f_inp, f_out):
         from gio import config
@@ -262,6 +265,8 @@ class map_obj(serv_base.service_base):
 
             if not os.path.exists(_f):
                 # if self.pp('cache') == '1':
+                logging.info('generating map tile (%s)' % _f)
+
                 self._dmap_mag_single(path, _f)
 
                 # _f = config.get_at('general', 'nodata_file')

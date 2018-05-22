@@ -24,7 +24,7 @@ def handle_error(error):
 def op_req(path):
     import re
     from flask import request
-    from geo_map_serv2 import serv_op, serv_web
+    import serv_op, serv_web
 
     _m = re.match('_(.+)', path)
     if _m:
@@ -75,7 +75,7 @@ def init():
 
     import os
     _f_log = os.environ['G_LOG_S']
-    logging_util.init(_f_log)
+    logging_util.init(_f_log, True)
 
     _app = Flask(__name__)
 
