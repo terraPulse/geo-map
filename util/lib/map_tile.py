@@ -158,6 +158,9 @@ class color_table:
 class band:
 
     def __init__(self, f, lev, e, f_msk, solid_bg, opts, fzip):
+        from gio import geo_raster_ex as gx
+        from gio import geo_raster as ge
+
         self.bnd = []
         if f.endswith('.shp'):
             if lev > 6:
@@ -169,12 +172,10 @@ class band:
             else:
                 _f_shp = f
 
-            from gio import geo_raster_ex as gx
             _bnd = gx.geo_band_stack_zip.from_shapefile(_f_shp, file_unzip=fzip, )
             if _bnd is not None:
                 self.bnd = [_bnd]
         else:
-            from gio import geo_raster as ge
             _img = ge.open(fzip.unzip(f))
             self.bnd = filter(lambda x: x is not None, [_img.get_band(_b + 1) for _b in xrange(_img.band_num)])
 
@@ -329,7 +330,7 @@ class band:
     def _load_block(self, mak):
         _bnd = self.bnd[0].read_block(mak)
 
-        if self.translate_color:
+        if _bnd and self.translate_color:
             import map_color
             _bnd = map_color.colorize_band(_bnd, self.translate_color)
 
@@ -344,6 +345,9 @@ class band:
                 import numpy as np
 
                 _bnd = self._load_block(bnd_out)
+                if _bnd is None:
+                    return None
+
                 _ddd = _bnd.data
 
                 _dat = _ddd.astype(np.uint8)
@@ -369,7 +373,7 @@ class band:
 
             return agg_band.perc(self._load_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
-        _agg = agg or config.cfg.get('conf', 'aggregate').strip()
+        _agg = agg or config.get('conf', 'aggregate', 'median').strip()
 
         if zoom <= 1:
             _bnd = self._load_block(bnd_out)
@@ -380,7 +384,10 @@ class band:
                 _bnd.data[_bnd.data > 100] = _bnd.nodata
             return _bnd
 
-        if _agg in [None, '', 'none', 'dominated']:
+        if _agg in [None, '', 'none', 'median']:
+            return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False)
+
+        if _agg in ['dominated']:
             return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, False)
 
         if _agg == 'mean':
@@ -402,7 +409,7 @@ class band:
 
     def _load_band(self, bnd, perc=None, vals=None, agg=None):
         if len(self.bnd) == 1:
-            _zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 10)
+            _zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 5)
             _bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg)
 
             if _bnd is None:
