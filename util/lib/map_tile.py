@@ -72,6 +72,12 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         except Exception:
             pass
 
+        from gio import config
+        _cache = config.get('conf', 'cache', None)
+        if not _cache:
+            _tmp = _zip.generate_file()
+            config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+
         _ext = tiles().extent(lev, col, row)
 
         from gio import geo_base as gb
