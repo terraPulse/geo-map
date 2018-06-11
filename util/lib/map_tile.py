@@ -373,7 +373,7 @@ class band:
 
             return agg_band.perc(self._load_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
 
-        _agg = agg or config.get('conf', 'aggregate', 'median').strip()
+        _agg = agg or config.get('conf', 'aggregate', 'median')
 
         if zoom <= 1:
             _bnd = self._load_block(bnd_out)
@@ -384,7 +384,7 @@ class band:
                 _bnd.data[_bnd.data > 100] = _bnd.nodata
             return _bnd
 
-        if _agg in [None, '', 'none', 'median']:
+        if _agg in ['median']:
             return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False)
 
         if _agg in ['dominated']:
