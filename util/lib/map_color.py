@@ -8,10 +8,11 @@ Description: colorize the map
 
 class color:
 
-    def __init__(self, n, v, c):
+    def __init__(self, n, v, c, t):
         self.n = n
         self.v = v
         self.c = c
+        self.t = t
 
     def __cmp__(self, o):
         return cmp(self.v, o.v)
@@ -30,8 +31,11 @@ def load_color_file(f):
             continue
 
         _cc = tuple(map(int, _vv[1:5]))
-        _vs.append(color(_n, float(_vv[0]), _cc))
+        _t = _vv[5]
+
+        _vs.append(color(_n, float(_vv[0]), _cc, _t))
         _cs[_n] = _cc
+        _ls[_n] = _vv[5]
 
         _n += 1
 
@@ -83,4 +87,3 @@ def colorize_band(bnd, f_clr):
     _out.color_table = _clr
 
     return _out
-

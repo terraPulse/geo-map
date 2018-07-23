@@ -6,26 +6,6 @@ Create: 2017-09-03 01:39:15
 Description:
 '''
 
-def load_color_file(f):
-    _ls = open(f).read().strip().splitlines()[2:]
-
-    _vs = []
-    _cs = {255: (255, 255, 255, 0)}
-
-    _p = -1
-    for _l in _ls:
-        _p += 1
-
-        _vv = _l.split(',')
-        if len(_vv) != 6:
-            raise Exception('color file cannot be accepted')
-
-        _vs.append(float(_vv[0]))
-        _cs[_p] = tuple(map(int, _vv[1:5]))
-
-    return _vs, _cs
-
-
 def main(opts):
     from geo_map_util import map_color
     import PIL.Image
@@ -62,9 +42,9 @@ def main(opts):
     for _i in xrange(_num):
         _pos = _i * 1.0 / _num
         _dra.text((13, int(_rows * _pos + _buf + _font_offset)), \
-                _txt(_vs[int(len(_vs) * _pos)].v), font=_fnt, fill=(0, 0, 0, 255))
+                _txt(_vs[int(len(_vs) * _pos)].t), font=_fnt, fill=(0, 0, 0, 255))
 
-    _dra.text((13, _rows + _buf + _font_offset), _txt(_vs[-1].v), font=_fnt, fill=(0, 0, 0, 255))
+    _dra.text((13, _rows + _buf + _font_offset), _txt(_vs[-1].t), font=_fnt, fill=(0, 0, 0, 255))
 
     _img.save(opts.output)
 
@@ -72,7 +52,7 @@ def usage():
     _p = environ_mag.usage(False)
 
     _p.add_argument('-i', '--input', dest='input', required=True)
-    _p.add_argument('-f', '--format', dest='format', default='%0.0f')
+    _p.add_argument('-f', '--format', dest='format', default='%s')
     _p.add_argument('-o', '--output', dest='output', required=True)
     _p.add_argument('-t', '--ticks', dest='ticks', type=int, default=6)
     _p.add_argument('-b', '--transparent-bg', dest='transparent_bg', action='store_true', default=False)
@@ -83,4 +63,3 @@ if __name__ == '__main__':
     from gio import environ_mag
     environ_mag.init_path()
     environ_mag.run(main, [environ_mag.config(usage())])
-
