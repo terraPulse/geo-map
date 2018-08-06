@@ -85,12 +85,10 @@ def load_zips(load=False):
         if _f.endswith('.zip'):
             _t = _f[:-4]
             if _t not in _zips:
-                print ' + loading zip', _f,
                 import sys
                 sys.stdout.flush()
 
                 _zips[_t] = read_zip.zip_file(os.path.join(_root, _f))
-                print 'done'
 
     return _zips
 
@@ -114,14 +112,11 @@ class map_obj(serv_base.service_base):
             # return _tods.append(f)
 
         _jobs.append(f)
-        print '+', len(_jobs)
-
         try:
             return self._dmap(f, f_out)
             # import time
             # time.sleep(2.0)
         finally:
-            print '-', len(_jobs)
             _jobs.pop()
 
     def _dmap(self, f, f_out):
@@ -141,14 +136,12 @@ class map_obj(serv_base.service_base):
         _m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
         _c = _pro % {'tag': _m.group(1), 'level': _m.group(2), 'col': _m.group(3), 'row': _m.group(4)}
 
-        # print _c
         from gio import run_commands
         _rs = run_commands.run(_c)
 
         logging.info('create tile: %s (%s)' % (_c, _rs[0]))
 
         return _rs[0] == 0
-        # print 'done', _c
 
     def _dmap_mag_single(self, f, f_out):
         # if len(_jobs) > 10 or f in _jobs:
@@ -177,7 +170,6 @@ class map_obj(serv_base.service_base):
             # time.sleep(2.0)
         finally:
             pass
-            # print '-', len(_jobs)
             # _jobs.pop()
 
     def _dmap_single(self, f_inp, f_out):
@@ -289,7 +281,7 @@ class map_obj(serv_base.service_base):
         if os.path.exists(os.path.join(_d_web, _q) if _q else _d_web):
 
             _pp = self._normalize_path(path)
-            logging.info('loading web path: ' + path + ' -> ' + _pp)
+            logging.debug('loading web path: ' + path + ' -> ' + _pp)
 
             _f = self._format_path(os.path.join(_d_web, _pp))
 
@@ -297,15 +289,8 @@ class map_obj(serv_base.service_base):
                 if not _f.endswith('.png'):
                     raise Exception('failed to find %s' % _pp)
 
-                # if self.pp('cache') == '1':
-                logging.info('generating map tile (%s)' % _f)
-
+                logging.debug('generating map tile (%s)' % _f)
                 self._dmap_mag_single(_pp, _f)
-
-                # _f = config.get_at('general', 'nodata_file')
-
-                # if os.path.exists(_f) == False:
-                #     print path, _f
 
                 if not os.path.exists(_f):
                     _f = config.get_at('general', 'nodata_file')
