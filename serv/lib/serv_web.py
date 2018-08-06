@@ -170,8 +170,7 @@ class map_obj(serv_base.service_base):
         _col = int(_m.group(3))
         _row = int(_m.group(4))
 
-        print '+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row)
-
+        logging.info('+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row))
         try:
             return self._dmap_single(f, f_out)
             # import time
@@ -252,6 +251,31 @@ class map_obj(serv_base.service_base):
 
         return _ps
 
+    def _normalize_path(self, p):
+        import re
+        _m = re.search('([^\/]+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)', p)
+        if not _m:
+            return None
+
+        _tag = _m.group(1)
+        _lev = int(_m.group(2))
+        _col = _m.group(3)
+        _row = _m.group(4)
+
+        _num = 2 ** _lev
+
+        if _col[0] in ('_', '-'):
+            _col = _num - int(_col[1:]) - 1
+        else:
+            _col = int(_col)
+
+        if _row[0] in ('_', '-'):
+            _row = _num - int(_row[1:]) - 1
+        else:
+            _row = int(_row)
+
+        return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
+
     def task(self, path):
         import os
         from gio import config
@@ -259,21 +283,24 @@ class map_obj(serv_base.service_base):
         if not path:
             path = '/'
 
-        _p, _v = path.split('/', 1) if '/' in path else ('', path)
+        _q, _v = path.split('/', 1) if '/' in path else ('', path)
         _d_web = config.get_at('general', 'map_path')
 
-        if os.path.exists(os.path.join(_d_web, _p) if _p else _d_web):
-            logging.info('loading web path: ' + path)
-            _f = self._format_path(os.path.join(_d_web, path))
+        if os.path.exists(os.path.join(_d_web, _q) if _q else _d_web):
+
+            _pp = self._normalize_path(path)
+            logging.info('loading web path: ' + path + ' -> ' + _pp)
+
+            _f = self._format_path(os.path.join(_d_web, _pp))
 
             if not os.path.exists(_f):
                 if not _f.endswith('.png'):
-                    raise Exception('failed to find %s' % path)
+                    raise Exception('failed to find %s' % _pp)
 
                 # if self.pp('cache') == '1':
                 logging.info('generating map tile (%s)' % _f)
 
-                self._dmap_mag_single(path, _f)
+                self._dmap_mag_single(_pp, _f)
 
                 # _f = config.get_at('general', 'nodata_file')
 
@@ -299,5 +326,5 @@ class map_obj(serv_base.service_base):
         #     else:
         #         return self.output_byte(path, _r)
 
-        raise Exception('no module found %s' % _p)
+        raise Exception('no module found %s' % _q)
 
