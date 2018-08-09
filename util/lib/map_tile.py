@@ -89,9 +89,9 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         logging.debug('generate tile %s' % _f)
         if percent != None:
             band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg, \
-                    mag=opts.get('mag', None))
+                    mag=opts.get('mag', None), opts=opts)
         else:
-            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make(_ext, f_clr, _f, agg=agg)
+            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make(_ext, f_clr, _f, agg=agg, opts=opts)
 
 class color_table:
 
@@ -342,9 +342,9 @@ class band:
 
         return _bnd
 
-    def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, vals=None, agg=None):
+    def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, vals=None, agg=None, opts={}):
         from gio import config
-        from gio import agg_band
+        from geo_map_util import agg_band
 
         if perc is not None:
             if zoom <= 1:
@@ -391,7 +391,8 @@ class band:
             return _bnd
 
         if _agg in ['median']:
-            return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False)
+            _zero_rate = opts.get('zero_rate', 0.5)
+            return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _zero_rate)
 
         if _agg in ['dominated']:
             return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, False)
@@ -413,10 +414,10 @@ class band:
 
         raise Exception('unknown aggregate option: %s' % _agg)
 
-    def _load_band(self, bnd, perc=None, vals=None, agg=None):
+    def _load_band(self, bnd, perc=None, vals=None, agg=None, opts={}):
         if len(self.bnd) == 1:
             _zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 5)
-            _bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg)
+            _bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg, opts)
 
             if _bnd is None:
                 return None
@@ -463,8 +464,8 @@ class band:
 
             _img.flush()
 
-    def make(self, bnd, f_clr, f_out, agg=None):
-        _bnd = self._load_band(bnd, agg=agg)
+    def make(self, bnd, f_clr, f_out, agg=None, opts={}):
+        _bnd = self._load_band(bnd, agg=agg, opts=opts)
         if _bnd is None:
             return
 
@@ -477,8 +478,8 @@ class band:
 
         self._save_band(_bnd, _cs, f_out)
 
-    def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None, mag=1):
-        _bnd = self._load_band(bnd, val, vals, agg=agg)
+    def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None, mag=1, opts={}):
+        _bnd = self._load_band(bnd, val, vals, agg=agg, opts=opts)
         if _bnd is None:
             return
 
@@ -496,4 +497,3 @@ class band:
         # self._save_band(_bnd, _cs, 'test_preview.png')
 
         self._save_band(_bnd, _cs, f_out)
-
