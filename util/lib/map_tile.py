@@ -391,7 +391,7 @@ class band:
             return _bnd
 
         if _agg in ['median']:
-            _zero_rate = opts.get('zero_rate', 0.5)
+            _zero_rate = float(opts.get('zero_rate', 1.0))
             return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _zero_rate)
 
         if _agg in ['dominated']:

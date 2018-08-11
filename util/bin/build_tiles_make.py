@@ -247,6 +247,20 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     if opts.solid_bg:
         _obj.solid_bg = True
 
+    # if opts.options:
+    #     import re
+    #     for _co in opts.options:
+    #         _m = re.match('(.+)\s*\=\s*(.+)', _co)
+    #         if _m:
+    #             print 'option %s=%s' % (_m.group(1), _m.group(2))
+    #             _obj[_m.gruop(1)] = _m.group(2)
+    #         else:
+    #             print ' skip %s' % _co
+
+    if opts.zero_rate is not None:
+        print 'zero rate: ', opts.zero_rate
+        _obj.zero_rate = opts.zero_rate
+
     _obj.visible = True
 
     if agg:
@@ -304,6 +318,7 @@ def usage():
     _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
     _p.add_argument('-m', '--mask', dest='mask')
     _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
+    _p.add_argument('--zero-rate', dest='zero_rate', type=float)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
         help='run build_tiles_task.py after the map task is generated')
@@ -314,4 +329,3 @@ if __name__ == '__main__':
     from gio import environ_mag
     environ_mag.init_path()
     environ_mag.run(main, [environ_mag.config(usage())])
-
