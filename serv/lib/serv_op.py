@@ -54,18 +54,30 @@ class op(serv_base.service_base):
         import identify_tile
         return self.output_json(identify_tile.tile(x, y))
 
-    def _pixel(self, x, y):
-        import identify_pixel
-        _vals = identify_pixel.pixels(x, y)
+    def _pixel(self, tag, x, y, vtype='json'):
+        logging.info('pixel query: tag (%s), pt (%s, %s)' % (tag, x, y))
 
-        return self.output_json(''.join(['<div><b>%s:</b> %s</div>' % (_k, _vals[_k]) for _k in sorted(_vals.keys())]))
+        if not tag:
+            vtype = 'html'
+
+        if tag:
+            import identify_pixel
+            _vals = identify_pixel.pixel(tag, x, y)
+        else:
+            import identify_pixel
+            _vals = identify_pixel.pixel_lc(tag, x, y)
+
+        if vtype == 'json':
+            return self.output_json(_vals)
+
+        if vtype == 'html':
+            return self.output_json(''.join(['<div><b>%s:</b> %s</div>' % \
+                    (_k, _vals[_k]) for _k in sorted(_vals.keys())]))
 
     def _forest_info(self, x, y):
         from gio import config
-        _cmd = config.get('conf', 'cmd_forest', 'detect_forest_change_pt.py --config $G_INI/detect_forest_change_test.ini -o {f} -c {x} {y}')
-
-        if not _cmd:
-            raise Exception('no file found %s' % _f_img)
+        _cmd = config.get('conf', 'cmd_forest', \
+                'detect_forest_change_pt.py --config $G_INI/detect_forest_change_test.ini -o {f} -c {x} {y}')
 
         from gio import file_unzip
         with file_unzip.file_unzip() as _zip:
@@ -105,10 +117,12 @@ class op(serv_base.service_base):
             return self._wrs_tile(_x, _y)
 
         if path == 'pixel':
+            _tag = self.pp('tag')
+            _v = self.pp('v', 'json')
             _x = self.pf('x')
             _y = self.pf('y')
 
-            return self._pixel(_x, _y)
+            return self._pixel(_tag, _x, _y, _v)
 
         if path == 'forest':
             _x = self.pf('x')
