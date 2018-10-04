@@ -377,7 +377,11 @@ class band:
                 _bnd = _bnd.from_grid(_dat, nodata=255)
                 return _bnd
 
-            return agg_band.perc(self._load_block(bnd_out.scale(zoom)), bnd_out, perc, vals)
+            _bnd = self._load_block(bnd_out.scale(zoom))
+            if _bnd is None:
+                return None
+
+            return agg_band.perc(_bnd, bnd_out, perc, vals)
 
         _agg = agg or config.get('conf', 'aggregate', 'median')
 
