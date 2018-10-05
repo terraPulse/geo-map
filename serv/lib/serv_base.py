@@ -8,8 +8,6 @@ class service_base:
 
     def pp(self, tag, d=None):
         if tag not in self.request.values:
-            if d is None:
-                raise Exception('not found parameter %s' % tag)
             return d
 
         _t = self.request.values[tag]

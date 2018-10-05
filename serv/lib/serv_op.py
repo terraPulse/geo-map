@@ -57,15 +57,13 @@ class op(serv_base.service_base):
     def _pixel(self, tag, x, y, vtype='json'):
         logging.info('pixel query: tag (%s), pt (%s, %s)' % (tag, x, y))
 
-        if not tag:
-            vtype = 'html'
-
-        if tag:
+        if tag != 'lc':
             import identify_pixel
             _vals = identify_pixel.pixel(tag, x, y)
         else:
-            import identify_pixel
-            _vals = identify_pixel.pixel_lc(tag, x, y)
+            import identify_pixel_lc
+            _vals = identify_pixel_lc.pixels(x, y)
+            vtype = 'html'
 
         if vtype == 'json':
             return self.output_json(_vals)
@@ -117,7 +115,7 @@ class op(serv_base.service_base):
             return self._wrs_tile(_x, _y)
 
         if path == 'pixel':
-            _tag = self.pp('tag')
+            _tag = self.pp('tag', 'lc')
             _v = self.pp('v', 'json')
             _x = self.pf('x')
             _y = self.pf('y')
