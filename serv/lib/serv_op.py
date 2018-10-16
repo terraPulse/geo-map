@@ -54,16 +54,19 @@ class op(serv_base.service_base):
         import identify_tile
         return self.output_json(identify_tile.tile(x, y))
 
-    def _pixel(self, tag, x, y, vtype='json'):
+    def _pixel(self, tag, x, y, vtype='json', reg=None):
         logging.info('pixel query: tag (%s), pt (%s, %s)' % (tag, x, y))
 
-        if tag != 'lc':
-            import identify_pixel
-            _vals = identify_pixel.pixel(tag, x, y)
-        else:
+        if tag == 'lc':
+            if reg:
+                raise Exception('extract LC pixel does not support reg parameter')
+
             import identify_pixel_lc
             _vals = identify_pixel_lc.pixels(x, y)
             vtype = 'html'
+        else:
+            import identify_pixel
+            _vals = identify_pixel.pixel(tag, x, y, reg)
 
         if vtype == 'json':
             return self.output_json(_vals)
@@ -119,8 +122,9 @@ class op(serv_base.service_base):
             _v = self.pp('v', 'json')
             _x = self.pf('x')
             _y = self.pf('y')
+            _reg = self.pp('reg')
 
-            return self._pixel(_tag, _x, _y, _v)
+            return self._pixel(_tag, _x, _y, _v, _reg)
 
         if path == 'forest':
             _x = self.pf('x')
