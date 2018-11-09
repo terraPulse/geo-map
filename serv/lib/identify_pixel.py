@@ -61,11 +61,20 @@ def _reg(lon, lat, reg):
 
     return _mm.from_grid(_dd)
 
+def _median(g):
+    # import logging
+    _vs = g.compressed().tolist()
+
+    # logging.info(_vs)
+    if len(_vs) == 0:
+        return None
+
+    _vs.sort()
+    return _vs[len(_vs) / 2]
+
 def _extract_reg(tag, mak):
     from gio import config
     import logging
-
-    import numpy as np
     import numpy.ma
 
     _ks = {}
@@ -81,13 +90,23 @@ def _extract_reg(tag, mak):
         logging.info('checking %s=%s' % (_k, _f))
 
         _bd = _read_block(_f, mak)
-        _da = numpy.ma.array(_bd.data, mask=mak.data != 1)
-        _vv = np.ma.median(_da)
+
+        # _da = numpy.ma.array(_bd.data, mask=(mak.data != 1))
+        # if int(_k) == 2001:
+        #     logging.info(_da.compressed())
+        #
+        # _da = numpy.ma.array(_bd.data, mask=(mak.data != 1) | (_bd.data == _bd.nodata))
+        # if int(_k) == 2001:
+        #     logging.info(_da.compressed())
+        # _vv = np.ma.median(_da)
+
+        _da = numpy.ma.array(_bd.data, mask=(mak.data != 1) | (_bd.data == _bd.nodata))
+        _vv = _median(_da)
 
         if _vv is None:
             continue
 
-        _vs[_k] = _vv[0]
+        _vs[_k] = _vv
 
     return _vs
 

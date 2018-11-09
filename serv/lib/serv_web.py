@@ -279,11 +279,8 @@ class map_obj(serv_base.service_base):
         _d_web = config.get_at('general', 'map_path')
 
         if os.path.exists(os.path.join(_d_web, _q) if _q else _d_web):
-
             _pp = self._normalize_path(path)
-            logging.debug('loading web path: ' + path + ' -> ' + _pp)
-
-            _f = self._format_path(os.path.join(_d_web, _pp))
+            _f = self._format_path(os.path.join(_d_web, _pp if _pp else path))
 
             if not os.path.exists(_f):
                 if not _f.endswith('.png'):

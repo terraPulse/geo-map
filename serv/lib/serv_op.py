@@ -72,8 +72,8 @@ class op(serv_base.service_base):
             return self.output_json(_vals)
 
         if vtype == 'html':
-            return self.output_json(''.join(['<div><b>%s:</b> %s</div>' % \
-                    (_k, _vals[_k]) for _k in sorted(_vals.keys())]))
+            return self.output_json(''.join(['<div><b>%s:</b> %s (%s)</div>' % \
+                    (_k, '-' * (_vals[_k] / 2), _vals[_k]) for _k in sorted(_vals.keys())]))
 
     def _forest_info(self, x, y):
         from gio import config
