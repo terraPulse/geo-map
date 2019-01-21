@@ -72,8 +72,13 @@ class op(serv_base.service_base):
             return self.output_json(_vals)
 
         if vtype == 'html':
-            return self.output_json(''.join(['<div><b>%s:</b> %s (%s)</div>' % \
-                    (_k, '-' * (_vals[_k] / 2), _vals[_k]) for _k in sorted(_vals.keys())]))
+            _to_lon = lambda v: '%s%s' % (abs(v), 'E' if v >= 0 else 'W')
+            _to_lat = lambda v: '%s%s' % (abs(v), 'N' if v >= 0 else 'S')
+
+            _txt = '<div><b>%s, %s</b></div><hr/>' % (_to_lon(x), _to_lat(y))
+            return self.output_json(''.join([_txt] + ['<div><b>%s:</b> %s (%s)</div>' % \
+                    (_k, ('-' * (_vals[_k] / 2)) if _vals[_k] is not None else '', \
+                    _vals[_k]) for _k in sorted(_vals.keys())]))
 
     def _forest_info(self, x, y):
         from gio import config
