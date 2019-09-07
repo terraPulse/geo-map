@@ -149,7 +149,7 @@ class map_obj(serv_base.service_base):
         #     return
 
         import re
-        _m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f)
+        _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f)
         if not _m:
             return
 
@@ -180,7 +180,7 @@ class map_obj(serv_base.service_base):
         if os.path.exists(f_out):
             return
 
-        _m = re.search('([^\/]+)\/(\d+)\/(\d+)\/(\d+).png', f_inp)
+        _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f_inp)
 
         _tag = _m.group(1)
         _lev = int(_m.group(2))
@@ -245,7 +245,7 @@ class map_obj(serv_base.service_base):
 
     def _normalize_path(self, p):
         import re
-        _m = re.search('([^\/]+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)', p)
+        _m = re.search('^(.+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)$', p)
         if not _m:
             return None
 
