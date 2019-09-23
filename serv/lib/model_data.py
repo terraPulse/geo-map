@@ -10,13 +10,13 @@ class geo_band:
 
 	def to_geo_band_cache(self):
 		from gio import geo_raster as ge
-		import model_utility as mu
+		from . import model_utility as mu
 
 		return ge.geo_band_cache(mu.decode_array(self.data), self.geo_transform, mu.proj_from_proj4(self.proj), nodata=self.nodata, pixel_type=self.pixel_type)
 
 	@staticmethod
 	def from_geo_band_cache(obj):
-		import model_utility as mu
+		from . import model_utility as mu
 
 		return geo_band(mu.encode_array(obj.data), obj.geo_transform, mu.proj_to_proj4(obj.proj), obj.nodata, obj.pixel_type)
 
@@ -93,11 +93,11 @@ class data_text(data_simple):
 class data_binary(data_simple):
 
 	def decode(self, txt):
-		import model_utility
+		from . import model_utility
 		return model_utility.decode_binary(txt)
 
 	def encode(self, obj):
-		import model_utility
+		from . import model_utility
 		return model_utility.encode_binary(obj)
 
 class data_time(data_simple):
@@ -158,7 +158,7 @@ class data_projection(data_simple):
 		data_simple.__init__(self)
 
 	def encode(self, obj):
-		import model_utility
+		from . import model_utility
 		return model_utility.proj_to_proj4(obj)
 
 	def decode(self, text):
@@ -168,7 +168,7 @@ class data_projection(data_simple):
 			from gio import geo_raster as ge
 			return ge.proj_from_epsg(int(_m.group(1)))
 
-		import model_utility
+		from . import model_utility
 		return model_utility.proj_from_proj4(str(text))
 
 class data_item:
@@ -228,7 +228,7 @@ class data_extent(data_complex):
 
 	def decode(self, txt):
 		from gio import geo_base as gb
-		import model_utility
+		from . import model_utility
 
 		_ext = gb.geo_extent(float(txt.minx), float(txt.miny), float(txt.maxx), float(txt.maxy), model_utility.proj_from_proj4(txt.proj))
 		return _ext
@@ -251,13 +251,13 @@ d_band = data_band()
 d_binary = data_binary()
 
 def convert_to_builtin_type(obj):
-	import model_utility
+	from . import model_utility
 
 	if type(obj).__name__ == 'SpatialReference':
 		return model_utility.proj_to_proj4(obj)
 
 	_d = {}
-	for _k, _v in obj.__dict__.items():
+	for _k, _v in list(obj.__dict__.items()):
 		if _v == None:
 			continue
 

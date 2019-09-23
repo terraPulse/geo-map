@@ -6,7 +6,7 @@ Create: 2016-04-28 11:34:49
 Description:
 '''
 
-import serv_base
+from . import serv_base
 import logging
 
 class op(serv_base.service_base):
@@ -15,7 +15,7 @@ class op(serv_base.service_base):
         serv_base.service_base.__init__(self, request)
 
     def _ndvi(self, x, y, frm=None):
-        import mod_ndvi
+        from . import mod_ndvi
         from gio import file_unzip
         from gio import config
 
@@ -51,7 +51,7 @@ class op(serv_base.service_base):
             raise Exception('no file found %s' % _f_img)
 
     def _wrs_tile(self, x, y):
-        import identify_tile
+        from . import identify_tile
         return self.output_json(identify_tile.tile(x, y))
 
     def _pixel(self, tag, x, y, vtype='json', reg=None):
@@ -61,11 +61,11 @@ class op(serv_base.service_base):
             if reg:
                 raise Exception('extract LC pixel does not support reg parameter')
 
-            import identify_pixel_lc
+            from . import identify_pixel_lc
             _vals = identify_pixel_lc.pixels(x, y)
             vtype = 'html'
         else:
-            import identify_pixel
+            from . import identify_pixel
             _vals = identify_pixel.pixel(tag, x, y, reg)
 
         if vtype == 'json':
@@ -91,7 +91,7 @@ class op(serv_base.service_base):
 
             from gio import run_commands
             _c = _cmd.format(**{'x': x, 'y': y, 'f': _f_tmp})
-            print _c
+            print(_c)
 
             logging.info('RUN: ' + _c)
             run_commands.run(_c)

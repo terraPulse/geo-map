@@ -38,7 +38,7 @@ def main(opts):
 
     from gio import multi_task
     _tt = multi_task.load(_ps, opts)
-    print '%s tasks' % len(_tt)
+    print('%s tasks' % len(_tt))
 
     if opts.output:
         logging.info('updating output folder %s' % opts.output)

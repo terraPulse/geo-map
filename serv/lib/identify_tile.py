@@ -50,7 +50,7 @@ def _init_env():
 	if not config.cfg.has_section('conf'):
 		config.cfg.add_section('conf')
 
-	for _k, _v in _opts.__dict__.items():
+	for _k, _v in list(_opts.__dict__.items()):
 		if _v != None:
 			config.cfg.set('conf', _k, str(_v))
 

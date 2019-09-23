@@ -19,8 +19,8 @@ def main(opts):
 
     _img = PIL.Image.new('RGBA', (81, _height), (255, 255, 255, 0 if opts.transparent_bg else 255))
 
-    for _row in xrange(0, _rows):
-        for _col in xrange(0, 10):
+    for _row in range(0, _rows):
+        for _col in range(0, 10):
             _rrr = min(_rows - 1, int((_row * len(_vs)) /_rows))
             _clr = _cs[_rrr]
 
@@ -39,7 +39,7 @@ def main(opts):
     _txt = lambda x: opts.format % x
     _num = min(len(_vs), opts.ticks)
 
-    for _i in xrange(_num):
+    for _i in range(_num):
         _pos = _i * 1.0 / _num
         _dra.text((13, int(_rows * _pos + _buf + _font_offset)), \
                 _txt(_vs[int(len(_vs) * _pos)].t), font=_fnt, fill=(0, 0, 0, 255))

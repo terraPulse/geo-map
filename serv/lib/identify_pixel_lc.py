@@ -54,7 +54,7 @@ def pixels(x, y, tags=None):
             }
 
     _vals = {}
-    for _k, _f in _tags.items():
+    for _k, _f in list(_tags.items()):
         if tags is not None and _k not in tags:
             continue
 
@@ -66,7 +66,7 @@ def pixels(x, y, tags=None):
     return _vals
 
 def main(opts):
-    print pixels(-76.940678, 38.982370)
+    print(pixels(-76.940678, 38.982370))
 
 def usage():
     _p = environ_mag.usage(False)

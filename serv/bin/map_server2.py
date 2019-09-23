@@ -60,16 +60,16 @@ def op(path):
     try:
         _r = op_req(path)
     except KeyboardInterrupt:
-        print '\n\n* User stopped the program'
+        print('\n\n* User stopped the program')
         import sys
         sys.exit(0)
-    except Exception, err:
+    except Exception as err:
         import traceback
 
         logging.error(traceback.format_exc())
         logging.error(str(err))
 
-        print '\n\n* Error:', err
+        print('\n\n* Error:', err)
         raise err
 
     if _r is None:

@@ -85,7 +85,7 @@ class color_table:
         _rg = lambda x: min(max(0, x), 255)
 
         _c = c
-        for i in xrange(_c.GetCount()):
+        for i in range(_c.GetCount()):
             try:
                 _v = _c.GetColorEntry(i)
             except:
@@ -94,13 +94,13 @@ class color_table:
             if len(_v) == 3:
                 _v = list(_v) + [255]
 
-            _cs[i] = map(_rg, _v)
+            _cs[i] = list(map(_rg, _v))
 
         return _cs
 
     def save(self, f):
         _ls = []
-        for _k, _v in self._cs.items():
+        for _k, _v in list(self._cs.items()):
             _ls.append('%s %s' % (_k, ','.join(map(str, _v))))
 
         with open(f, 'w') as _fo:
@@ -143,8 +143,8 @@ class tiles:
         _cols = 2 ** level
 
         _num = -1
-        for _row in xrange(_rows):
-            for _col in xrange(_cols):
+        for _row in range(_rows):
+            for _col in range(_cols):
                 _num += 1
 
                 _x = -self.p + (_col * _r)
@@ -179,7 +179,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     # detect the extent of input file
     _ext = load_shp(_f) if f_inp.endswith('.shp') else load_img(_f, fzip)
     logging.info('detected extent %s' % str(_ext))
-    print 'detected extent', _ext
+    print('detected extent', _ext)
 
     _f_clr = os.path.join(d_out, 'color.txt')
     if not f_clr:
@@ -190,7 +190,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
         else:
             _f_clr = color_table.load(_f, fzip).save(_f_clr)
 
-        print 'loading color table', _f_clr
+        print('loading color table', _f_clr)
     else:
         import shutil
         shutil.copy(f_clr, _f_clr)
@@ -201,15 +201,15 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     _tiles = tiles()
 
     _ps = []
-    print opts.mask
-    for _lev in xrange(levels[0], levels[1]+1):
-        print ' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev)
+    print(opts.mask)
+    for _lev in range(levels[0], levels[1]+1):
+        print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
         for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
             _ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
                     _f_clr, opts.mask, d_out))
 
     logging.info('found %s task' % len(_ps))
-    print 'found %s tasks' % len(_ps)
+    print('found %s tasks' % len(_ps))
 
     # print 'write map.html'
     # from gio import geo_raster as ge
@@ -224,7 +224,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     #             'zmin': levels[0], 'zmax': levels[1]
     #             })
 
-    print 'write to', os.path.join(d_out, 'tasks.txt')
+    print('write to', os.path.join(d_out, 'tasks.txt'))
     with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
         import pickle
         pickle.dump(_ps, _fo)
@@ -258,7 +258,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     #             print ' skip %s' % _co
 
     if opts.zero_rate is not None:
-        print 'zero rate: ', opts.zero_rate
+        print('zero rate: ', opts.zero_rate)
         _obj.zero_rate = opts.zero_rate
 
     _obj.visible = True
@@ -291,7 +291,7 @@ def main(opts):
                 opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_out, _zip, opts)
 
     if opts.execute:
-        print 'generate map tiles'
+        print('generate map tiles')
 
         _cmd = 'build_tiles_task.py -t %s ' % opts.tag
         # _agg = ' -a %s ' % opts.agg if opts.agg else ''

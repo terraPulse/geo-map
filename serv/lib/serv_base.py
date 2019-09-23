@@ -1,6 +1,6 @@
 
 import logging
-import webapp2
+# import webapp2
 
 class service_base:
     def __init__(self, request):
@@ -38,7 +38,7 @@ class service_base:
 
     def output_json(self, obj):
         import json
-        import model_data
+        from . import model_data
 
         from flask import make_response
         _text = json.dumps(obj, default=model_data.convert_to_builtin_type,
@@ -74,15 +74,15 @@ class service_base:
 
         logging.error(traceback.format_exc())
         logging.error(str(exception))
-        print '\n\n* Error:', traceback.format_exc()
+        print('\n\n* Error:', traceback.format_exc())
 
         _json = {'message': str(exception.message)}
-        if isinstance(exception, webapp2.HTTPException):
-
-            _json['code'] = exception.code
-        else:
-            self.response.set_status(500)
-            _json['code'] = 500
+        # if isinstance(exception, webapp2.HTTPException):
+        #     _json['code'] = exception.code
+        # else:
+        
+        self.response.set_status(500)
+        _json['code'] = 500
 
         return self.output_json({'error': _json})
 

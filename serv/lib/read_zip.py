@@ -38,7 +38,7 @@ def main():
 	_z = zip_file(r'h:\mfeng\test\glcf\fcc_1975\test\map\test1\water_2000.zip')
 
 	_f = '10/917/500.png'
-	print 'read', _f
+	print('read', _f)
 	with open('500.png', 'wb') as _fo:
 		_fo.write(_z.load(_f))
 

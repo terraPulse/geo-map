@@ -12,7 +12,7 @@ def get_ip_address():
     import subprocess
 
     _p = subprocess.Popen(['hostname', '-I'], stdout=subprocess.PIPE)
-    _d = [_v.strip() for _v in _p.communicate()[0].split(' ') if _v.strip()]
+    _d = [_v.strip() for _v in _p.communicate()[0].decode("utf-8").split(' ') if _v.strip()]
 
     logging.info('ip list: ' + ', '.join(_d))
     if len(_d) == 0:
