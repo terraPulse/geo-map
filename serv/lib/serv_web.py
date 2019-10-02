@@ -48,6 +48,7 @@ class web(serv_base.service_base):
         import re
         from gio import config
         from gio import file_unzip
+        from gio import file_mag
 
         _path = path
         if _path == '' or _path == '/':
@@ -56,10 +57,9 @@ class web(serv_base.service_base):
         _d_web = config.get_at('general', 'web_path')
         _f_res = os.path.join(_d_web, _path)
 
-        if not os.path.exists(_f_res):
+        if file_mag.get(_f_res).exists():
             logging.error('no file found %s' % _f_res)
             return
-            # raise Exception('no file found %s' % _f_res)
 
         logging.info('loading web path: ' + path)
         if re.search('js/map.*\.js', _f_res):
@@ -174,11 +174,9 @@ class map_obj(serv_base.service_base):
 
     def _dmap_single(self, f_inp, f_out):
         from gio import config
+        from gio import file_mag
         import os
         import re
-
-        if os.path.exists(f_out):
-            return
 
         _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f_inp)
 
@@ -200,9 +198,9 @@ class map_obj(serv_base.service_base):
             _clr = config.get(_tag, 'color', None)
         else:
             _f_ini = os.path.join(_out, 'setting.ini')
-            if os.path.exists(_f_ini):
+            if file_mag.get(_f_ini).exists():
                 from gio import obj
-                _met = obj.load(_f_ini)
+                _met = obj.load(file_mag.get(_f_ini).get())
 
                 _inp = _met.get('file')
                 _pec = _met.getint('percent')
@@ -271,28 +269,45 @@ class map_obj(serv_base.service_base):
     def task(self, path):
         import os
         from gio import config
+        from gio import file_mag
 
         if not path:
             path = '/'
 
         _q, _v = path.split('/', 1) if '/' in path else ('', path)
         _d_web = config.get_at('general', 'map_path')
+        
+        logging.info('map path: %s' % _d_web)
 
-        if os.path.exists(os.path.join(_d_web, _q) if _q else _d_web):
+        # if file_mag.get(os.path.join(_d_web, _q) if _q else _d_web).exists():
+        if True:
             _pp = self._normalize_path(path)
             _f = self._format_path(os.path.join(_d_web, _pp if _pp else path))
+            
+            logging.info('request tile %s' % _f)
 
-            if not os.path.exists(_f):
-                if not _f.endswith('.png'):
-                    raise Exception('failed to find %s' % _pp)
-
-                logging.debug('generating map tile (%s)' % _f)
-                self._dmap_mag_single(_pp, _f)
-
-                if not os.path.exists(_f):
-                    _f = config.get_at('general', 'nodata_file')
-
-            return self.output_file(_f)
+            if not _f.endswith('.png'):
+                raise Exception('failed to find %s' % _pp)
+                
+            from gio import file_unzip
+            from gio import config
+            
+            with file_unzip.zip() as _zip:
+                _cache = config.get('conf', 'cache', None)
+                if not _cache:
+                    _tmp = _zip.generate_file()
+                    config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+                    
+                if not file_mag.get(_f).exists():
+                    logging.info('generate tile %s' % _f)
+                    logging.debug('generating map tile (%s)' % _f)
+                    self._dmap_mag_single(_pp, _f)
+    
+                    logging.info('get tile %s' % _f)
+                    if not file_mag.get(_f).exists():
+                        _f = config.get_at('general', 'nodata_file')
+    
+                return self.output_file(_f)
 
         # _zips = load_zips()
         # if _p not in _zips.keys():

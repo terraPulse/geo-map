@@ -23,8 +23,10 @@ def main(opts):
 	import os
 	_out = os.path.join(config.get('conf', 'output'), _tag)
 	_fot = os.path.join(_out, str(opts.level), str(opts.col), str(opts.row) + '.png')
+	
+	from gio import file_mag
 
-	if os.path.exists(_fot):
+	if file_mag.get(_fot).exists():
 		return
 
 	_pec = config.getint(_tag, 'percent', None)
@@ -36,7 +38,7 @@ def main(opts):
 	map_tile.make_tile(_inp, opts.level, opts.col, opts.row, \
 			_pec, _clr, _out)
 
-	if not os.path.exists(_fot):
+	if file_mag.get(_fot).exists():
 		import sys
 		sys.exit(1)
 

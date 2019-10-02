@@ -1,6 +1,5 @@
 
 import logging
-import webapp2
 
 class service_base:
     def __init__(self, request):
@@ -49,8 +48,14 @@ class service_base:
         return _resp
 
     def output_file(self, f, attachment=False):
+        from gio import file_mag
         import flask
-        return flask.send_file(f, as_attachment=attachment)
+        
+        _f = file_mag.get(f)
+        if _f.exists():
+            return flask.send_file(_f.get(), as_attachment=attachment)
+            
+        return self.output_byte(f, '')
 
     def output_byte(self, f, b, attachment=False):
         from flask import make_response
@@ -77,12 +82,9 @@ class service_base:
         print '\n\n* Error:', traceback.format_exc()
 
         _json = {'message': str(exception.message)}
-        if isinstance(exception, webapp2.HTTPException):
-
-            _json['code'] = exception.code
-        else:
-            self.response.set_status(500)
-            _json['code'] = 500
+        
+        self.response.set_status(500)
+        _json['code'] = 500
 
         return self.output_json({'error': _json})
 

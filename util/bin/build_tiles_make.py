@@ -170,7 +170,7 @@ class tiles:
         from gio import geo_raster as ge
         return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
-def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, fzip, opts):
+def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d_ooo, fzip, opts):
     import os
     from gio import file_mag
 
@@ -201,12 +201,12 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     _tiles = tiles()
 
     _ps = []
-    print opts.mask
+    print os.path.join(d_ooo, os.path.basename(_f_clr))
     for _lev in xrange(levels[0], levels[1]+1):
         print ' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev)
         for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
             _ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
-                    _f_clr, opts.mask, d_out))
+                    os.path.join(d_ooo, os.path.basename(_f_clr)), opts.mask, d_ooo))
 
     logging.info('found %s task' % len(_ps))
     print 'found %s tasks' % len(_ps)
@@ -224,7 +224,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, f
     #             'zmin': levels[0], 'zmax': levels[1]
     #             })
 
-    print 'write to', os.path.join(d_out, 'tasks.txt')
+    print 'write to', os.path.join(d_ooo, 'tasks.txt')
     with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
         import pickle
         pickle.dump(_ps, _fo)
@@ -278,17 +278,25 @@ def main(opts):
     from gio import config
 
     import os
-    _d_out = format_path(os.path.abspath(os.path.join(config.get('conf', 'output'), opts.tag)))
-    os.path.exists(_d_out) or os.makedirs(_d_out)
+    
+    _d_out = os.path.join(config.get('conf', 'output'), opts.tag)
+    if not _d_out.startswith('s3://'):
+        _d_out = format_path(os.path.abspath(_d_out))
 
     from gio import file_unzip
     with file_unzip.file_unzip() as _zip:
         _f_inp = config.get('conf', 'input')
         if not _f_inp.startswith('s3://'):
             _f_inp = os.path.abspath(_f_inp)
-
+        
+        _d_tmp = _zip.generate_file()
+        os.makedirs(_d_tmp)
+        
         make(format_path(_f_inp), config.get('conf', 'color'), config.get('conf', 'translate_color'), \
-                opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_out, _zip, opts)
+                opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_tmp, \
+                _d_out, _zip, opts)
+                
+        file_unzip.compress_folder(_d_tmp, _d_out, [])
 
     if opts.execute:
         print 'generate map tiles'

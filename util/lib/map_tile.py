@@ -57,21 +57,17 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
     # from osgeo import gdal
     # gdal.UseExceptions()
     import os
+    from gio import file_mag
 
     _d = os.path.join(d_out, str(lev), str(col))
 
     _f = os.path.join(_d, '%s.png' % row)
-    if os.path.exists(_f) and os.path.getsize(_f) > 0:
+    if file_mag.get(_f).exists():
         logging.debug('skip %s' % _f)
         return
 
     from gio import file_unzip
     with file_unzip.file_unzip() as _zip:
-        try:
-            os.path.exists(_d) or os.makedirs(_d)
-        except Exception:
-            pass
-
         from gio import config
         _cache = config.get('conf', 'cache', None)
         if not _cache:
@@ -83,15 +79,23 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         from gio import geo_base as gb
         _eee = _ext.extent().to_polygon().project_to(gb.modis_projection()).extent()
 
-        from gio import file_mag
         _finp = file_mag.get(f).get()
 
         logging.debug('generate tile %s' % _f)
+        
+        _d_tmp = _zip.generate_file()
+        os.makedirs(_d_tmp)
+        _f_tmp = os.path.join(_d_tmp, os.path.basename(_f))
+        
         if percent != None:
-            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, vals, f_clr, _f, agg=agg, \
+            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
+                    vals, f_clr, _f_tmp, agg=agg, \
                     mag=opts.get('mag', None), opts=opts)
         else:
-            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make(_ext, f_clr, _f, agg=agg, opts=opts)
+            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make(_ext, \
+                    f_clr, _f_tmp, agg=agg, opts=opts)
+        
+        file_unzip.compress_folder(_d_tmp, os.path.dirname(_f), [])
 
 class color_table:
 
@@ -226,9 +230,10 @@ class band:
 
     def _load_color(self, f):
         import re
+        from gio import file_mag
 
         _cs = {}
-        with open(f) as _fi:
+        with open(file_mag.get(f).get()) as _fi:
             for _l in _fi.read().splitlines():
                 _vs = re.split('\s+', _l.strip())
                 if len(_vs) < 2:

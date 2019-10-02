@@ -30,27 +30,29 @@ def main(opts):
     import os
     from gio import config
     import logging
+    from gio import file_mag
 
     _out = os.path.join(config.get('conf', 'input'), opts.tag)
 
-    with open(os.path.join(_out, 'tasks.txt'), 'rb') as _fi:
+    with open(file_mag.get(os.path.join(_out, 'tasks.txt')).get(), 'rb') as _fi:
         _ps = pickle.load(_fi)
 
     from gio import multi_task
     _tt = multi_task.load(_ps, opts)
     print '%s tasks' % len(_tt)
-
-    if opts.output:
-        logging.info('updating output folder %s' % opts.output)
-        _tt = [_t[:-2] + (config.get('conf', 'output'), ) for _t in _tt]
+    
+    _d_out = config.get('conf', 'output')
+    if _d_out:
+        logging.info('updating output folder %s' % _d_out)
+        _tt = [_t[:-2] + (_d_out, ) for _t in _tt]
 
     _f_ini = os.path.join(_out, 'setting.ini')
     _met = {}
 
-    if os.path.exists(_f_ini):
+    if file_mag.get(_f_ini).exists():
         logging.info('loading setting file: %s' % _f_ini)
         from gio import obj
-        _met = obj.load(_f_ini)
+        _met = obj.load(file_mag.get(_f_ini).get())
 
     multi_task.run(_make_tile, _tt, opts, (_met, opts, ))
 
