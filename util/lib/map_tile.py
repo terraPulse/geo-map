@@ -163,7 +163,7 @@ class color_table:
         for _f in _lyr:
             return _f.items()['FILE']
 
-        raise None
+        return None
 
 class band:
 
@@ -174,11 +174,16 @@ class band:
         self.bnd = []
         if f.endswith('.shp'):
             if lev > 6:
+            # if False:
+                from gio import file_mag
                 _f_shp = fzip.generate_file('', '.shp')
-                _cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, f)
-
+                _cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, file_mag.get(f).get())
+                
+                import os
+                import sys
+                
                 from gio import run_commands
-                run_commands.run(_cmd)
+                run_commands.run(_cmd, env=os.environ, stdout=sys.stdout, stderr=sys.stderr)
             else:
                 _f_shp = f
 
@@ -472,9 +477,10 @@ class band:
                 _img.get_band(_b+1).write(self.bnd[_b].read_block(bnd[0]).data, 0, 0)
 
             _img.flush()
-
+            
     def make(self, bnd, f_clr, f_out, agg=None, opts={}):
         _bnd = self._load_band(bnd, agg=agg, opts=opts)
+        
         if _bnd is None:
             return
 
