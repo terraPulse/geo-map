@@ -1,6 +1,8 @@
 
 FROM minfeng/landsat-util:latest
 
+RUN pip install pypng
+
 LABEL creator Min Feng
 ENV DEBIAN_FRONTEND noninteractive
 
