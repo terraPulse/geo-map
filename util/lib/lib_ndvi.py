@@ -59,17 +59,18 @@ def plot(ds, t, f_out, width=1020, height=250, dpi=96):
     matplotlib.use('Agg')
 
     import matplotlib.pyplot as plt
-    _fig = plt.figure(1, figsize=(int(width/dpi), int(height/dpi)))
+    _fig = plt.figure(1, figsize=(int(width/dpi), int(height/dpi)), dpi=dpi)
 
     from matplotlib.ticker import MaxNLocator
     # import matplotlib.dates as mdates
 
-    _axes = plt.axes([0.05, 0.15, 0.93, 0.70])
+    _axes = plt.axes([0.05, 0.18, 0.93, 0.70])
     
     _xs = []
     _ys = []
     
-    for _d in sorted(ds.keys()):
+    _ds = sorted(ds.keys())
+    for _d in _ds:
         _xs.append(_d)
         _ys.append(ds[_d])
 
@@ -78,12 +79,38 @@ def plot(ds, t, f_out, width=1020, height=250, dpi=96):
     if t:
         plt.title(t)
 
-    _axes.xaxis.set_minor_locator(MaxNLocator(integer=True))
-    _axes.xaxis.set_major_locator(MaxNLocator(integer=True))
+    _addy = True
+
+    import matplotlib.dates as mdates
+
+    # _fmt = mdates.DateFormatter('%m/%Y' if _addy else '%m/%y')
+    _fmt = mdates.DateFormatter('%Y' if _addy else '%m/%y')
+    _axes.xaxis.set_major_formatter(_fmt)
+
+    # _axes.xaxis.set_major_locator(mdates.YearLocator(interval=12))
+    _axes.xaxis.set_major_locator(mdates.YearLocator())
+    _axes.xaxis.set_minor_locator(mdates.MonthLocator())
+
+    # _axes.xaxis.set_minor_locator(MaxNLocator(integer=True))
+    # _axes.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     _axes.set_ylim([0, 1.05])
 
+    import datetime
+    _axes.set_xlim([datetime.datetime(_ds[0].year, 1, 1), datetime.datetime(_ds[-1].year, 12, 31)])
+
     _axes.grid(True, which='major', alpha=0.6, linewidth=1.5)
     _axes.grid(True, which='minor', alpha=0.3)
+
+    for _t in _axes.yaxis.get_major_ticks():
+        _t.label.set_fontsize(9)
+
+    for _t in _axes.xaxis.get_major_ticks():
+        _t.label.set_fontsize(9)
+        if _addy:
+            _t.label.set_rotation(35)
+            _t.label.set_ha('center')
+        else:
+            _t.label.set_rotation(15)
 
     _fig.savefig(f_out)
