@@ -532,7 +532,7 @@ cdef np.ndarray[np.int16_t, ndim=2] median_pixels(np.ndarray[np.int16_t, ndim=2]
                     _vv = _vs[0]
                 else:
                     _vs.sort()
-                    _vv = _vs[_len / 2]
+                    _vv = _vs[int(_len / 2)]
 
             _dat[_row_n, _col_n] = _vv
 
