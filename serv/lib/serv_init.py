@@ -24,7 +24,7 @@ def handle_error(error):
 def op_req(path):
     import re
     from flask import request
-    import serv_op, serv_web
+    from . import serv_op, serv_web
 
     _m = re.match('_(.+)', path)
     if _m:
@@ -51,16 +51,16 @@ def op(path):
 
         return _r
     except KeyboardInterrupt:
-        print '\n\n* User stopped the program'
+        print('\n\n* User stopped the program')
         import sys
         sys.exit(0)
-    except Exception, err:
+    except Exception as err:
         import traceback
 
         logging.error(traceback.format_exc())
         logging.error(str(err))
 
-        print '\n\n* Error:', err
+        print('\n\n* Error:', err)
         raise err
 
     # from flask import abort

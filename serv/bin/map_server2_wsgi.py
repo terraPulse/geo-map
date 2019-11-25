@@ -9,12 +9,11 @@ Description:
 import logging
 
 def get_ip_address():
-    import subprocess
+    from gio import run_commands
 
-    _p = subprocess.Popen(['hostname', '-I'], stdout=subprocess.PIPE)
-    _d = [_v.strip() for _v in _p.communicate()[0].split(' ') if _v.strip()]
-
+    _d = [_v.strip() for _v in run_commands.run('hostname -I')[1].split(' ') if _v.strip()]
     logging.info('ip list: ' + ', '.join(_d))
+
     if len(_d) == 0:
         raise Exception('failed to find ip address')
 

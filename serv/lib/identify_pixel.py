@@ -86,7 +86,7 @@ def _extract_reg(tag, mak):
             _ks[_k] = config.get(tag, _k)
 
     _vs = {}
-    for _k, _f in _ks.items():
+    for _k, _f in list(_ks.items()):
         logging.info('checking %s=%s' % (_k, _f))
 
         _bd = _read_block(_f, mak)
@@ -123,7 +123,7 @@ def _extract_pt(tag, lon, lat):
             _ks[_k] = config.get(tag, _k)
 
     _vs = {}
-    for _k, _f in _ks.items():
+    for _k, _f in list(_ks.items()):
         logging.info('checking %s=%s' % (_k, _f))
         if not _f.endswith('.shp'):
             continue
@@ -142,7 +142,7 @@ def pixel(tag, lon, lat, reg=None):
 
 def main(opts):
     _x, _y = -69.41634178161534, 18.438209639795115
-    print pixel('dr', _x, _y)
+    print(pixel('dr', _x, _y))
 
 def usage():
     _p = environ_mag.usage(False)

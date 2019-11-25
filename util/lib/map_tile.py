@@ -30,8 +30,8 @@ class tiles:
         _cols = 2 ** level
 
         _num = -1
-        for _row in xrange(_rows):
-            for _col in xrange(_cols):
+        for _row in range(_rows):
+            for _col in range(_cols):
                 _num += 1
 
                 _x = -self.p + (_col * _r)
@@ -128,7 +128,7 @@ class color_table:
         _rg = lambda x: min(max(0, x), 255)
 
         _c = c
-        for i in xrange(_c.GetCount()):
+        for i in range(_c.GetCount()):
             try:
                 _v = _c.GetColorEntry(i)
             except:
@@ -137,13 +137,13 @@ class color_table:
             if len(_v) == 3:
                 _v = list(_v) + [255]
 
-            _cs[i] = map(_rg, _v)
+            _cs[i] = list(map(_rg, _v))
 
         return _cs
 
     def save(self, f):
         _ls = []
-        for _k, _v in self._cs.items():
+        for _k, _v in list(self._cs.items()):
             _ls.append('%s %s' % (_k, ','.join(map(str, _v))))
 
         with open(f, 'w') as _fo:
@@ -161,7 +161,7 @@ class color_table:
 
         _lyr = _shp.GetLayer()
         for _f in _lyr:
-            return _f.items()['FILE']
+            return list(_f.items())['FILE']
 
         return None
 
@@ -192,7 +192,7 @@ class band:
                 self.bnd = [_bnd]
         else:
             _img = ge.open(fzip.unzip(f))
-            self.bnd = filter(lambda x: x is not None, [_img.get_band(_b + 1) for _b in xrange(_img.band_num)])
+            self.bnd = [x for x in [_img.get_band(_b + 1) for _b in range(_img.band_num)] if x is not None]
 
         self.color = self.bnd[0].color_table if len(self.bnd) == 1 else None
         self.solid_bg = solid_bg
@@ -213,7 +213,7 @@ class band:
         _rg = lambda x: min(max(0, x), 255)
 
         _c = c.Clone()
-        for i in xrange(_c.GetCount()):
+        for i in range(_c.GetCount()):
             try:
                 _v = _c.GetColorEntry(i)
             except:
@@ -222,12 +222,12 @@ class band:
             if len(_v) == 3:
                 _v = list(_v) + [255]
 
-            _cs[i] = map(_rg, _v)
+            _cs[i] = list(map(_rg, _v))
 
         return _cs
 
     def _save(self, bnd, cs, f):
-        import mod_image
+        from . import mod_image
         _dat = mod_image.convert(bnd, cs)
 
         import png
@@ -253,7 +253,7 @@ class band:
         return _cs
 
     def _interp_colors(self, cs, v_val, scale=100):
-        if cs == None or len(cs.keys()) == 0:
+        if cs == None or len(list(cs.keys())) == 0:
             raise Exception('no color table provided')
 
         _c2 = cs[v_val]
@@ -262,18 +262,18 @@ class band:
 
         # _c1 = [255, 255, 255, 0] #cs[v_non]
         # _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
-        _c1 = list(map(lambda x: max(0, min(255, x)), [(255 + _v) / 2 for _v in _c2]))
+        _c1 = list([max(0, min(255, x)) for x in [(255 + _v) / 2 for _v in _c2]])
 
         if len(_c1) > 3:
             _c1 = _c1[:3]
 
         _c1 = _c1 + [80]
 
-        _ss = [(_c2[i] - _c1[i]) / float(scale) for i in xrange(len(_c1))]
+        _ss = [(_c2[i] - _c1[i]) / float(scale) for i in range(len(_c1))]
         _cs = {0: [255, 255, 255, 0]}
 
-        for i in xrange(scale):
-            _cs[i + 1] = [int(_c1[_b] + (i * _ss[_b]))  for _b in xrange(len(_c1))]
+        for i in range(scale):
+            _cs[i + 1] = [int(_c1[_b] + (i * _ss[_b]))  for _b in range(len(_c1))]
             if len(_cs[i+1]) > 3:
                 _cs[i+1][-1] = max(_cs[i+1][-1], 80)
 
@@ -282,7 +282,7 @@ class band:
         return _cs
 
     def _interp_colors_t(self, cs, v_val, scale=100, mag=1):
-        if cs == None or len(cs.keys()) == 0:
+        if cs == None or len(list(cs.keys())) == 0:
             raise Exception('no color table provided')
 
         _c2 = cs[v_val]
@@ -292,14 +292,14 @@ class band:
         _mag = (1 if mag is None else mag)
 
         _cs = {255: [255, 255, 255, 0]}
-        for i in xrange(scale + 1):
+        for i in range(scale + 1):
             _t = min(int(i * 2.56 * _mag), 255)
             _cs[i] = list(_c2) + [_t]
 
         return _cs
 
     def _interp_colors_solid_bg(self, cs, v_val, scale=100, max_val=100):
-        if cs == None or len(cs.keys()) == 0:
+        if cs == None or len(list(cs.keys())) == 0:
             raise Exception('no color table provided')
 
         _c2 = cs[v_val]
@@ -310,12 +310,12 @@ class band:
 
         _c1 = _c1 + [255]
 
-        _ss = [(_c2[i] - _c1[i]) / float(max_val) for i in xrange(len(_c1))]
+        _ss = [(_c2[i] - _c1[i]) / float(max_val) for i in range(len(_c1))]
         _cs = {0: [255, 255, 255, 255], 255: [0, 0, 0, 0]}
 
-        for i in xrange(scale):
+        for i in range(scale):
             # _cs[i + 1] = [int(_c1[_b] + (min(i, max_val) * _ss[_b]))  for _b in xrange(len(_c1))]
-            _cs[i + 1] = map(lambda x: max(0, min(255, x)), [int(_c1[_b] + i * _ss[_b])  for _b in xrange(len(_c1))])
+            _cs[i + 1] = [max(0, min(255, x)) for x in [int(_c1[_b] + i * _ss[_b])  for _b in range(len(_c1))]]
             if len(_cs[i+1]) > 3:
                 _cs[i+1][-1] = max(_cs[i+1][-1], 255)
 
@@ -347,7 +347,7 @@ class band:
         _bnd = self.bnd[0].read_block(mak)
 
         if _bnd and self.translate_color:
-            import map_color
+            from . import map_color
             _bnd = map_color.colorize_band(_bnd, self.translate_color)
 
         return _bnd
@@ -449,10 +449,10 @@ class band:
 
             return [_bnd]
         else:
-            return [self.bnd[_b].read_block(bnd) for _b in xrange(len(self.bnd))]
+            return [self.bnd[_b].read_block(bnd) for _b in range(len(self.bnd))]
 
     def _save_band(self, bnd, cs, f_out):
-        if cs == None or cs.keys() == 0:
+        if cs == None or list(cs.keys()) == 0:
             raise Exception('failed to find color table')
 
         if len(bnd) == 0:
@@ -473,7 +473,7 @@ class band:
             _img = gdal.GetDriverByName('PNG').Create(f_out, bnd[0].width,\
                     bnd[0].height, len(self.bnd), gdal.GDT_Byte)
 
-            for _b in xrange(len(self.bnd)):
+            for _b in range(len(self.bnd)):
                 _img.get_band(_b+1).write(self.bnd[_b].read_block(bnd[0]).data, 0, 0)
 
             _img.flush()

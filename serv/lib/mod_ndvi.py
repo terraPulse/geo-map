@@ -85,7 +85,7 @@ def extract_NDVI(f_in,lon,lat,cell, f_out=None):
 	b_c = _col / cell
 
 	_ss = search_files(f_in,_tile,b_c,b_r)
-	_yy = _ss.keys()
+	_yy = list(_ss.keys())
 	_yy.sort()
 
 	_as = ['YYYY_MM_DD,NDVI']
@@ -93,7 +93,7 @@ def extract_NDVI(f_in,lon,lat,cell, f_out=None):
 	for _y in _yy:
 		_dat = _ss[_y]
 		_pixels = read_bytes(_dat,_rr,_cc,cell)
-		for _d in xrange(365):
+		for _d in range(365):
 			val = _pixels[_d]
 
 			if val < 100:
@@ -108,7 +108,7 @@ def extract_NDVI(f_in,lon,lat,cell, f_out=None):
 			_ls.append([_date, val / 1000.0])
 
 	_ss = [_l[1] for _l in _ls]
-	for _i in xrange(len(_ls)):
+	for _i in range(len(_ls)):
 		_vs = [_s for _s in _ss[max(0, _i - 3): min(_i + 3, len(_ss))]]
 		# _ls[_i][1] = sorted(_vs)[len(_vs) / 2]
 		_ls[_i][1] = sum(_vs) / len(_vs)

@@ -6,7 +6,7 @@ Create: 2016-04-28 11:34:49
 Description:
 '''
 
-import serv_base
+from . import serv_base
 import logging
 
 class op(serv_base.service_base):
@@ -14,12 +14,19 @@ class op(serv_base.service_base):
     def __init__(self, request):
         serv_base.service_base.__init__(self, request)
 
-    def _ndvi(self, x, y, frm=None):
-        import mod_ndvi
+    def _ndvi(self, x, y, frm='png'):
+        from . import mod_ndvi
         from gio import file_unzip
         from gio import config
 
         _l = config.get('general', 'ndvi_path')
+        if _l.startswith('http:'):
+            _url = _l + ('x=%s&y=%s' % (x, y))
+            logging.info('URL: %s' % _url)
+
+            import requests
+            _r = requests.get(_url)
+            return self.output_json(_r.json())
 
         with file_unzip.file_unzip() as _zip:
             _f_tmp  = _zip.generate_file('', '.csv') if frm == 'csv' else None
@@ -29,29 +36,42 @@ class op(serv_base.service_base):
             else:
                 return self.output_json(_rs)
 
-    def _ndvi_chart(self, x, y):
+    def _gee_ndvi(self, x, y, frm=None, w=1020, h=250):
+        from geo_map_util import lib_ndvi
+
+        _x, _y = x, y
+        _rs = lib_ndvi.gee_ndvi(_x, _y)
+
         from gio import file_unzip
-        from gio import run_commands
-        import os
+        with file_unzip.zip() as _zip:
+            if not frm or frm == 'json':
+                _ls = []
+                for _r in sorted(_rs.keys()):
+                    _ls.append((_r.strftime('%Y-%m-%d'), '%.3f' % _rs[_r]))
+                return self.output_json({'data': _ls})
 
-        with file_unzip.file_unzip() as _zip:
-            _d_tmp  = _zip.generate_file()
-            os.makedirs(_d_tmp)
+            _t = 'ndvi_%.6f_%.6f' % (_x, _y)
 
-            _d_dat = '/data/glcf-nx-001/jnagol/data/CBR_2015_proc/NDVI_stacks'
-            _cmd = 'Rscript Z_jot_plot_NDVI_TS_server_side.R %s %s %s %s' % (_d_tmp, _d_dat, y, x)
+            if frm.lower() == 'png':
+                _f_tmp  = _zip.generate_file('', '.png')
+                lib_ndvi.plot(_rs, None, _f_tmp, w, h)
+                with open(_f_tmp, 'rb') as _fi:
+                    return self.output_byte(_t + '.png', _fi.read(), False)
+            else:
+                _ls = ['date,ndvi']
+                for _r in sorted(_rs.keys()):
+                    _ls.append('%s,%.3f' % (_r.strftime('%Y-%m-%d'), _rs[_r]))
 
-            run_commands.run(_cmd, cwd='/data/glcf-st-004/data/workspace/fengm/serv/script')
+                _f_tmp  = _zip.generate_file('', '.csv')
+                _zip.save(_f_tmp, '\n'.join(_ls))
 
-            _f_img = os.path.join(_d_tmp, 'Z_jot_plot.png')
-            if os.path.exists(_f_img):
-                logging.info('loading NDVI (%s, %s) %s' % (x, y, _f_img))
-                return self.output_file(_f_img)
+                with open(_f_tmp, 'rb') as _fi:
+                    return self.output_byte(_t + '.csv', _fi.read())
 
-            raise Exception('no file found %s' % _f_img)
+            raise Exception('unsupported format %s' % frm)
 
     def _wrs_tile(self, x, y):
-        import identify_tile
+        from . import identify_tile
         return self.output_json(identify_tile.tile(x, y))
 
     def _pixel(self, tag, x, y, vtype='json', reg=None):
@@ -61,11 +81,11 @@ class op(serv_base.service_base):
             if reg:
                 raise Exception('extract LC pixel does not support reg parameter')
 
-            import identify_pixel_lc
+            from . import identify_pixel_lc
             _vals = identify_pixel_lc.pixels(x, y)
             vtype = 'html'
         else:
-            import identify_pixel
+            from . import identify_pixel
             _vals = identify_pixel.pixel(tag, x, y, reg)
 
         if vtype == 'json':
@@ -91,7 +111,6 @@ class op(serv_base.service_base):
 
             from gio import run_commands
             _c = _cmd.format(**{'x': x, 'y': y, 'f': _f_tmp})
-            print _c
 
             logging.info('RUN: ' + _c)
             run_commands.run(_c)
@@ -104,7 +123,12 @@ class op(serv_base.service_base):
             _y = self.pf('y')
 
             return self._ndvi(_x, _y, self.pp('frm', None))
-            # return self._ndvi_chart(_x, _y)
+
+        if path == 'gee_ndvi':
+            _x = self.pf('x')
+            _y = self.pf('y')
+
+            return self._gee_ndvi(_x, _y, self.pp('format', self.pp('frm', None)), self.pi('w'), self.pi('h'))
 
         if path == 'ndvi_p':
             _x = self.pf('x')
@@ -112,7 +136,8 @@ class op(serv_base.service_base):
 
             import requests
             # _json = requests.get('http://terrapulse.com:8080/_ndvi?x=%s&y=%s' % (_x, _y))
-            _json = requests.get('http://52.54.49.254:8080/_ndvi?x=%s&y=%s' % (_x, _y))
+            # _json = requests.get('http://52.54.49.254:8080/_ndvi?x=%s&y=%s' % (_x, _y))
+            _json = requests.get('http://10.0.1.11:8080/_ndvi?x=%s&y=%s' % (_x, _y))
 
             return self.output_json(_json.json())
 

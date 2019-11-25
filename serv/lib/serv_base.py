@@ -16,6 +16,10 @@ class service_base:
         _t = self.pp(tag)
         return d if _t == None else float(_t)
 
+    def pi(self, tag, d=None):
+        _t = self.pp(tag)
+        return d if _t == None else int(_t)
+
     def get(self, *arg):
         return self.__task(*arg)
 
@@ -37,7 +41,7 @@ class service_base:
 
     def output_json(self, obj):
         import json
-        import model_data
+        from . import model_data
 
         from flask import make_response
         _text = json.dumps(obj, default=model_data.convert_to_builtin_type,
@@ -47,13 +51,15 @@ class service_base:
 
         return _resp
 
-    def output_file(self, f, attachment=False):
+    def output_file(self, f, attachment=False, file_name=None):
         from gio import file_mag
         import flask
         
         _f = file_mag.get(f)
         if _f.exists():
-            return flask.send_file(_f.get(), as_attachment=attachment)
+            import os
+            _n = file_name if file_name else os.path.basename(f)
+            return flask.send_file(_f.get(), as_attachment=attachment, attachment_filename=_n)
             
         return self.output_byte(f, '')
 
@@ -79,7 +85,7 @@ class service_base:
 
         logging.error(traceback.format_exc())
         logging.error(str(exception))
-        print '\n\n* Error:', traceback.format_exc()
+        print('\n\n* Error:', traceback.format_exc())
 
         _json = {'message': str(exception.message)}
         

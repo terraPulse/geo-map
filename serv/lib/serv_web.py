@@ -1,6 +1,6 @@
 
 
-import serv_base
+from . import serv_base
 import logging
 
 _jobs = []
@@ -78,7 +78,7 @@ def load_zips(load=False):
 
     import os
     from gio import config
-    import read_zip
+    from . import read_zip
 
     _root = config.get_at('general', 'map_path')
     for _f in os.listdir(_root):
