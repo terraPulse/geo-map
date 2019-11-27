@@ -17,7 +17,31 @@ def add_NDVI_457(image):
     _add_NDVI_1 = image.addBands(_NDVI)
     
     return _add_NDVI_1
+
+def add_NDSI_8(image):
+    _NDVI = image.normalizedDifference(["B3", "B6"]).rename('NDVI')
+    _add_NDVI_1 = image.addBands(_NDVI)
     
+    return _add_NDVI_1
+    
+def add_NDSI_457(image):
+    _NDVI = image.normalizedDifference(["B2", "B5"]).rename('NDVI')
+    _add_NDVI_1 = image.addBands(_NDVI)
+    
+    return _add_NDVI_1
+    
+def add_NDWI_8(image):
+    _NDVI = image.normalizedDifference(["B3", "B5"]).rename('NDVI')
+    _add_NDVI_1 = image.addBands(_NDVI)
+    
+    return _add_NDVI_1
+    
+def add_NDWI_457(image):
+    _NDVI = image.normalizedDifference(["B2", "B4"]).rename('NDVI')
+    _add_NDVI_1 = image.addBands(_NDVI)
+    
+    return _add_NDVI_1
+
 def add_landsat_records(pt, ls, images, ndvi_func, date_s, date_e):
     import ee
     import datetime
@@ -51,6 +75,34 @@ def gee_ndvi(x, y, date_s=None, date_e=None):
     add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDVI_457, date_s, date_e)
     add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDVI_457, date_s, date_e)
     add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDVI_457, date_s, date_e)
+
+    return _ls
+
+def gee_ndsi(x, y, date_s=None, date_e=None):
+    import ee
+    ee.Initialize()
+    
+    _pt = ee.Geometry.Point(x, y)
+    _ls = {}
+
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDSI_8, date_s, date_e)
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDSI_457, date_s, date_e)
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDSI_457, date_s, date_e)
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDSI_457, date_s, date_e)
+
+    return _ls
+
+def gee_ndwi(x, y, date_s=None, date_e=None):
+    import ee
+    ee.Initialize()
+    
+    _pt = ee.Geometry.Point(x, y)
+    _ls = {}
+
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDWI_8, date_s, date_e)
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDWI_457, date_s, date_e)
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDWI_457, date_s, date_e)
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDWI_457, date_s, date_e)
 
     return _ls
 

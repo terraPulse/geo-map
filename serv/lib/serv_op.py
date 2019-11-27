@@ -36,11 +36,21 @@ class op(serv_base.service_base):
             else:
                 return self.output_json(_rs)
 
-    def _gee_ndvi(self, x, y, frm=None, w=1020, h=250):
+    def _gee_index(self, x, y, frm=None, w=1020, h=250, tag='ndvi'):
         from geo_map_util import lib_ndvi
 
         _x, _y = x, y
-        _rs = lib_ndvi.gee_ndvi(_x, _y)
+
+        _rs = None
+
+        if tag == 'ndvi':
+            _rs = lib_ndvi.gee_ndvi(_x, _y)
+        elif tag == 'ndwi':
+            _rs = lib_ndvi.gee_ndwi(_x, _y)
+        elif tag == 'ndsi':
+            _rs = lib_ndvi.gee_ndsi(_x, _y)
+        else:
+            raise Exception('unsupported index %s' % tag)
 
         from gio import file_unzip
         with file_unzip.zip() as _zip:
@@ -128,7 +138,8 @@ class op(serv_base.service_base):
             _x = self.pf('x')
             _y = self.pf('y')
 
-            return self._gee_ndvi(_x, _y, self.pp('format', self.pp('frm', None)), self.pi('w'), self.pi('h'))
+            return self._gee_index(_x, _y, self.pp('format', self.pp('frm', None)), \
+                    self.pi('w'), self.pi('h'), tag=self.pp('tag', 'ndvi'))
 
         if path == 'ndvi_p':
             _x = self.pf('x')
