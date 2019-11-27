@@ -14,8 +14,17 @@ class color:
         self.c = c
         self.t = t
 
-    def __cmp__(self, o):
-        return cmp(self.v, o.v)
+    def __lt__(self, o):
+        return self.v < o.v
+
+    def __gt__(self, o):
+        return self.v > o.v
+
+    def __eq__(self, o):
+        return self.v == o.v
+
+    def __nq__(self, o):
+        return self.v != o.v
 
 def load_color_file(f):
     with open(f) as _fi:
