@@ -144,11 +144,14 @@ class op(serv_base.service_base):
         if path == 'ndvi_p':
             _x = self.pf('x')
             _y = self.pf('y')
+            _d = self.pp('data', 'NDVI')
+
+            logging.info('request index: %s, %s (%s)' % (_x, _y, _d))
 
             import requests
             # _json = requests.get('http://terrapulse.com:8080/_ndvi?x=%s&y=%s' % (_x, _y))
             # _json = requests.get('http://52.54.49.254:8080/_ndvi?x=%s&y=%s' % (_x, _y))
-            _json = requests.get('http://10.0.1.11:8080/_ndvi?x=%s&y=%s' % (_x, _y))
+            _json = requests.get('http://10.0.1.11:8080/_ndvi?x=%s&y=%s&data=%s' % (_x, _y, _d))
 
             return self.output_json(_json.json())
 
