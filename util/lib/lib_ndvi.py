@@ -79,11 +79,11 @@ def add_landsat_records(pt, ls, images, ndvi_func, date_s, date_e):
     logging.info('add %s %s images' % (_n, images))
 
 def _valid_ndvi(v):
-    if v < 0.02:
-        return False
+    # if v < 0.02:
+    #     return False
 
-    if v > 0.95:
-        return False
+    # if v > 0.95:
+    #     return False
 
     return True
 
@@ -172,10 +172,10 @@ def gee_ndsi(x, y, date_s=None, date_e=None):
     _s = lambda x: date_s if date_s and (date_s > x) else x
     _e = lambda x: date_e if date_e and (date_e < x) else x
 
-    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDVI_8, _s('2013-04-11'), _e('2019-09-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDVI_457, _s('1999-01-01'), _e('2013-04-11'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDVI_457, _s('1984-01-01'), _e('1999-01-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDVI_457, _s('1982-08-22'), _e('1984-01-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDSI_8, _s('2013-04-11'), _e('2019-09-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDSI_457, _s('1999-01-01'), _e('2013-04-11'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDSI_457, _s('1984-01-01'), _e('1999-01-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDSI_457, _s('1982-08-22'), _e('1984-01-01'))
 
     return _ls
 
@@ -189,25 +189,21 @@ def gee_ndwi(x, y, date_s=None, date_e=None):
     _s = lambda x: date_s if date_s and (date_s > x) else x
     _e = lambda x: date_e if date_e and (date_e < x) else x
 
-    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDVI_8, _s('2013-04-11'), _e('2019-09-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDVI_457, _s('1999-01-01'), _e('2013-04-11'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDVI_457, _s('1984-01-01'), _e('1999-01-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDVI_457, _s('1982-08-22'), _e('1984-01-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDWI_8, _s('2013-04-11'), _e('2019-09-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDWI_457, _s('1999-01-01'), _e('2013-04-11'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDWI_457, _s('1984-01-01'), _e('1999-01-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDWI_457, _s('1982-08-22'), _e('1984-01-01'))
 
     return _ls
 
 def plot(ds, t, f_out, width=1020, height=250, dpi=96):
-    import matplotlib
-    matplotlib.use('Agg')
-
-    import matplotlib.pyplot as plt
-    _fig = plt.figure(1, figsize=(int(width/dpi), int(height/dpi)), dpi=dpi)
-
+    import matplotlib.figure
     from matplotlib.ticker import MaxNLocator
-    # import matplotlib.dates as mdates
+    import matplotlib.dates as mdates
 
-    _axes = plt.axes([0.05, 0.18, 0.93, 0.70])
-    
+    _fig = matplotlib.figure.Figure(figsize=(float(width)/dpi, float(height)/dpi), dpi=dpi)
+    _plt = _fig.add_axes((0.05, 0.18, 0.93, 0.70), frameon=True)
+
     _xs = []
     _ys = []
     
@@ -216,14 +212,13 @@ def plot(ds, t, f_out, width=1020, height=250, dpi=96):
         _xs.append(_d)
         _ys.append(ds[_d])
 
-    plt.plot(_xs, _ys, 'go-', markersize=1.2, linewidth=0.20)
+    _plt.plot(_xs, _ys, 'go-', markersize=1.8, linewidth=0.50)
     
     if t:
-        plt.title(t)
+        _plt.title(t)
 
+    _axes = _plt.axes
     _addy = True
-
-    import matplotlib.dates as mdates
 
     # _fmt = mdates.DateFormatter('%m/%Y' if _addy else '%m/%y')
     _fmt = mdates.DateFormatter('%Y' if _addy else '%m/%y')
@@ -256,4 +251,6 @@ def plot(ds, t, f_out, width=1020, height=250, dpi=96):
         else:
             _t.label.set_rotation(15)
 
-    _fig.savefig(f_out)
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    _cav = FigureCanvasAgg(_fig)
+    _cav.print_png(f_out, dpi=dpi)
