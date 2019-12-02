@@ -6,6 +6,9 @@ Create: 2018-06-27 23:57:54
 Description:
 '''
 
+import ee
+ee.Initialize()
+
 def add_NDVI_8(image):
     _NDVI = image.normalizedDifference(["B5", "B4"]).rename('NDVI')
     _add_NDVI_1 = image.addBands(_NDVI)
@@ -43,7 +46,6 @@ def add_NDWI_457(image):
     return _add_NDVI_1
 
 def add_landsat_records(pt, ls, images, ndvi_func, date_s, date_e):
-    import ee
     import datetime
     import logging
 
@@ -134,11 +136,8 @@ def agg_yearly(ls):
     return _ds
   
 def gee_ndvi(x, y, date_s=None, date_e=None):
-    import ee
     import logging
 
-    ee.Initialize()
-    
     _pt = ee.Geometry.Point(x, y)
     _ls = {}
 
