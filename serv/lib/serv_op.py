@@ -36,7 +36,7 @@ class op(serv_base.service_base):
             else:
                 return self.output_json(_rs)
 
-    def _gee_index(self, x, y, frm=None, w=1020, h=250, tag='ndvi'):
+    def _gee_index(self, x, y, frm=None, w=1020, h=250, tag='ndvi', agg=None, s=None, e=None):
         from geo_map_util import lib_ndvi
 
         _x, _y = x, y
@@ -44,13 +44,21 @@ class op(serv_base.service_base):
         _rs = None
 
         if tag == 'ndvi':
-            _rs = lib_ndvi.gee_ndvi(_x, _y)
+            _rs = lib_ndvi.gee_ndvi(_x, _y, date_s=s, date_e=e)
         elif tag == 'ndwi':
-            _rs = lib_ndvi.gee_ndwi(_x, _y)
+            _rs = lib_ndvi.gee_ndwi(_x, _y, date_s=s, date_e=e)
         elif tag == 'ndsi':
-            _rs = lib_ndvi.gee_ndsi(_x, _y)
+            _rs = lib_ndvi.gee_ndsi(_x, _y, date_s=s, date_e=e)
         else:
             raise Exception('unsupported index %s' % tag)
+
+        if agg:
+            if agg == 'month':
+                _rs = lib_ndvi.agg_monthly(_rs)
+            elif agg == 'year':
+                _rs = lib_ndvi.agg_yearly(_rs)
+            else:
+                raise Exception('unsupported aggregation type %s' % agg)
 
         from gio import file_unzip
         with file_unzip.zip() as _zip:
@@ -139,7 +147,8 @@ class op(serv_base.service_base):
             _y = self.pf('y')
 
             return self._gee_index(_x, _y, self.pp('format', self.pp('frm', None)), \
-                    self.pi('w'), self.pi('h'), tag=self.pp('tag', 'ndvi'))
+                    self.pi('w'), self.pi('h'), tag=self.pp('tag', 'ndvi'), agg=self.pp('agg'), \
+                    s=self.pp('s'), e=self.pp('e'))
 
         if path == 'ndvi_p':
             _x = self.pf('x')
