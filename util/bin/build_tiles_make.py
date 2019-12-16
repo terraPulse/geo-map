@@ -118,7 +118,7 @@ class color_table:
 
         _lyr = _shp.GetLayer()
         for _f in _lyr:
-            return list(_f.items())['FILE']
+            return _f.items()['FILE']
 
         raise None
 
@@ -244,6 +244,9 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     if opts.mask:
         _obj.mask = opts.mask
 
+    if opts.region:
+        _obj.region = opts.region
+
     if opts.solid_bg:
         _obj.solid_bg = True
 
@@ -325,6 +328,7 @@ def usage():
     _p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
     _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
     _p.add_argument('-m', '--mask', dest='mask')
+    _p.add_argument('-r', '--region', dest='region')
     _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
     _p.add_argument('--zero-rate', dest='zero_rate', type=float)
 

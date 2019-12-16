@@ -53,6 +53,39 @@ class tiles:
         from gio import geo_raster as ge
         return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
+def _mask_grid(bnd, f, fzip):
+    _f_out = fzip.generate_file('', '.tif')
+    
+    from gio import geo_raster as ge
+    import numpy as np
+    
+    _dat = np.zeros((bnd.height, bnd.width), dtype=np.uint8)
+    _bnd = bnd.from_grid(_dat)
+    _bnd.pixel_type = ge.pixel_type()
+    _bnd.save(_f_out)
+    
+    from osgeo import ogr
+    from gio import run_commands
+    from gio import file_mag
+
+    _f_inp = file_mag.get(f).get()
+    _f_shp = _f_inp
+
+    _shp = ogr.Open(_f_inp)
+    _lyr = _shp.GetLayer()
+
+    if not _lyr.GetSpatialRef().IsSame(_bnd.proj):
+        _f_shp = fzip.generate_file('', '.shp')
+
+        _cmd = 'ogr2ogr -t_srs "%s" %s %s' % (_bnd.proj.ExportToProj4(), _f_shp, _f_inp)
+        run_commands.run(_cmd)
+
+    _cmd = 'gdal_rasterize -at -burn 1 %s %s' % (_f_shp, _f_out)
+    run_commands.run(_cmd)
+
+    _bbb = ge.open(_f_out).get_band().cache()
+    bnd.data[_bbb.data != 1] = bnd.nodata
+
 def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
     # from osgeo import gdal
     # gdal.UseExceptions()
@@ -202,6 +235,7 @@ class band:
         if f_msk:
             self.mask = gx.geo_band_stack_zip.from_shapefile(f_msk) if f_msk.endswith('.shp') \
                     else ge.open(f_msk).get_band()
+        self.region = opts.get('region', None)
 
         self.fzip = fzip
 
@@ -466,6 +500,11 @@ class band:
                 _msk = self.mask.read_block(bnd[0])
                 if _msk:
                     bnd[0].data[_msk.data != 1] = bnd[0].nodata
+
+            if self.region is not None:
+                from gio import file_unzip as fzip
+                with fzip.zip() as _zip:
+                    _mask_grid(bnd[0], self.region, _zip)
 
             self._save(bnd[0], cs, f_out)
         else:
