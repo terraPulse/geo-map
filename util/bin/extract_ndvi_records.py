@@ -25,7 +25,7 @@ def main(opts):
             for _r in sorted(_rs.keys()):
                 _ls.append('%s,%.3f' % (_r.strftime('%Y-%m-%d'), _rs[_r]))
 
-            _zip.save(opts.output, '\n'.join(_ls))
+            _zip.save('\n'.join(_ls), opts.output)
     
 def usage():
     _p = environ_mag.usage(True)
