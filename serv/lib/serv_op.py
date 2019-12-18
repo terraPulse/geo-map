@@ -81,7 +81,7 @@ class op(serv_base.service_base):
                     _ls.append('%s,%.3f' % (_r.strftime('%Y-%m-%d'), _rs[_r]))
 
                 _f_tmp  = _zip.generate_file('', '.csv')
-                _zip.save(_f_tmp, '\n'.join(_ls))
+                _zip.save('\n'.join(_ls), _f_tmp)
 
                 with open(_f_tmp, 'rb') as _fi:
                     return self.output_byte(_t + '.csv', _fi.read())
