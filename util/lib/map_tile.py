@@ -109,9 +109,6 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
 
         _ext = tiles().extent(lev, col, row)
 
-        from gio import geo_base as gb
-        _eee = _ext.extent().to_polygon().project_to(gb.modis_projection()).extent()
-
         _finp = file_mag.get(f).get()
 
         logging.debug('generate tile %s' % _f)
@@ -121,11 +118,11 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         _f_tmp = os.path.join(_d_tmp, os.path.basename(_f))
         
         if percent != None:
-            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
+            band(_finp, lev, _ext, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
                     vals, f_clr, _f_tmp, agg=agg, \
                     mag=opts.get('mag', None), opts=opts)
         else:
-            band(_finp, lev, _eee, f_msk, solid_bg, opts, _zip).make(_ext, \
+            band(_finp, lev, _ext, f_msk, solid_bg, opts, _zip).make(_ext, \
                     f_clr, _f_tmp, agg=agg, opts=opts)
         
         file_unzip.compress_folder(_d_tmp, os.path.dirname(_f), [])
@@ -200,44 +197,62 @@ class color_table:
 
 class band:
 
-    def __init__(self, f, lev, e, f_msk, solid_bg, opts, fzip):
-        from gio import geo_raster_ex as gx
-        from gio import geo_raster as ge
+    def __init__(self, f, lev, ext, f_msk, solid_bg, opts, fzip):
+        # from gio import geo_base as gb
+        # _eee = _ext.extent().to_polygon().project_to(gb.modis_projection()).extent()
 
-        self.bnd = []
-        if f.endswith('.shp'):
-            if lev > 6:
-            # if False:
-                from gio import file_mag
-                _f_shp = fzip.generate_file('', '.shp')
-                _cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, file_mag.get(f).get())
-                
-                import os
-                import sys
-                
-                from gio import run_commands
-                run_commands.run(_cmd, env=os.environ, stdout=sys.stdout, stderr=sys.stderr)
-            else:
-                _f_shp = f
-
-            _bnd = gx.geo_band_stack_zip.from_shapefile(_f_shp, file_unzip=fzip, )
-            if _bnd is not None:
-                self.bnd = [_bnd]
-        else:
-            _img = ge.open(fzip.unzip(f))
-            self.bnd = [x for x in [_img.get_band(_b + 1) for _b in range(_img.band_num)] if x is not None]
-
+        self.bnd = self._load_file(f, lev, ext, fzip)
+        if self.bnd is None:
+            return
+        
         self.color = self.bnd[0].color_table if len(self.bnd) == 1 else None
         self.solid_bg = solid_bg
         self.translate_color = opts.get('translate_color', None)
 
         self.mask = None
         if f_msk:
-            self.mask = gx.geo_band_stack_zip.from_shapefile(f_msk) if f_msk.endswith('.shp') \
-                    else ge.open(f_msk).get_band()
-        self.region = opts.get('region', None)
+            from gio import geo_raster_ex as gx
+            from gio import geo_raster as ge
 
+            self.mask = gx.geo_band_stack_zip.from_shapefile(f_msk, extent=ext) if not f_msk.endswith('.tif') \
+                    else ge.open(f_msk).get_band()
+                    
+        self.region = opts.get('region', None)
         self.fzip = fzip
+    
+    def _load_file(self, f, lev, ext, fzip):
+        from gio import geo_raster_ex as gx
+        from gio import geo_raster as ge
+        
+        if not (f.endswith('.shp') or f.startswith('PG:')):
+            _img = ge.open(fzip.unzip(f))
+            _bnd = [x for x in [_img.get_band(_b + 1) for _b in range(_img.band_num)] if x is not None]
+            return _bnd
+            
+        # _f_shp = f
+        # if lev > 6:
+        #     import os
+        #     import sys
+        #     from gio import run_commands
+            
+        #     if f.endswith('.shp'):
+        #         from gio import file_mag
+        #         _f_shp = fzip.generate_file('', '.shp')
+        #         _cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, file_mag.get(f).get())
+        #         run_commands.run(_cmd, env=os.environ, stdout=sys.stdout, stderr=sys.stderr)
+                
+        #     elif f.startswith('PG:'):
+        #         _f_shp = fzip.generate_file('', '.shp')
+        #         _cmd = 'ogr2ogr -spat %s %s %s %s %s PG:"%s"' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, f[3:])
+        #         run_commands.run(_cmd, env=os.environ, stdout=sys.stdout, stderr=sys.stderr)
+        #     else:
+        #         pass
+            
+        _bnd = gx.geo_band_stack_zip.from_shapefile(f, file_unzip=fzip, extent=ext)
+        if _bnd is not None:
+            return [_bnd]
+            
+        return None
 
     def _color(self, c):
         _cs = {}
@@ -463,6 +478,9 @@ class band:
         raise Exception('unknown aggregate option: %s' % _agg)
 
     def _load_band(self, bnd, perc=None, vals=None, agg=None, opts={}):
+        if self.bnd is None:
+            return None
+            
         if len(self.bnd) == 1:
             _zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 5)
             _bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg, opts)
@@ -519,7 +537,6 @@ class band:
             
     def make(self, bnd, f_clr, f_out, agg=None, opts={}):
         _bnd = self._load_band(bnd, agg=agg, opts=opts)
-        
         if _bnd is None:
             return
 
