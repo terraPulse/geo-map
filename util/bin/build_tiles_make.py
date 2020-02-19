@@ -19,9 +19,10 @@ def format_path(p):
 
 def load_shp(f):
     from osgeo import ogr
+    from gio import file_mag
     from gio import geo_base as gb
 
-    _shp = ogr.Open(f)
+    _shp = ogr.Open(file_mag.get(f).get())
     if _shp is None:
         raise Exception('Failed to load shapefile ' + f)
 
@@ -178,6 +179,10 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
 
     # detect the extent of input file
     _ext = load_shp(_f) if f_inp.endswith('.shp') else load_img(_f, fzip)
+    if opts.region:
+        _rrr = load_shp(opts.region)
+        _ext = _ext.intersect(_rrr)
+
     logging.info('detected extent %s' % str(_ext))
     print('detected extent', _ext)
 
