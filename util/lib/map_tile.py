@@ -458,8 +458,7 @@ class band:
             return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _zero_rate)
 
         if _agg in ['dominated']:
-            _rate = 0.20
-            logging.info('dominated aggregation %s' % _rate) 
+            _rate = float(opts.get('zero_rate', 0.20))
             return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _rate)
 
         if _agg == 'mean':
