@@ -403,7 +403,7 @@ class band:
 
     def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, vals=None, agg=None, opts={}):
         from gio import config
-        from geo_map_util import agg_band
+        from gio import agg_band
 
         if perc is not None:
             if zoom <= 1:
@@ -458,7 +458,9 @@ class band:
             return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _zero_rate)
 
         if _agg in ['dominated']:
-            return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, False)
+            _rate = 0.20
+            logging.info('dominated aggregation %s' % _rate) 
+            return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _rate)
 
         if _agg == 'mean':
             _bnd_inp = self._load_block(bnd_out.scale(zoom))
