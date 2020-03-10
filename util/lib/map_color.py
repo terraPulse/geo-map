@@ -27,7 +27,8 @@ class color:
         return self.v != o.v
 
 def load_color_file(f):
-    with open(f) as _fi:
+    from gio import file_mag
+    with open(file_mag.get(f).get()) as _fi:
         _ls = _fi.read().strip().splitlines()[2:]
 
     _cs = {}

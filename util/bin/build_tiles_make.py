@@ -275,7 +275,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         _obj.agg = agg
 
     if f_tclr:
-        _obj.translate_color = os.path.abspath(f_tclr)
+        _obj.translate_color = os.path.abspath(f_tclr) if os.path.exists(f_tclr) else f_tclr
 
     _obj.save(os.path.join(d_out, 'setting.ini'))
 
