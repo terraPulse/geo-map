@@ -268,6 +268,10 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     if opts.zero_rate is not None:
         print('zero rate: ', opts.zero_rate)
         _obj.zero_rate = opts.zero_rate
+        
+    if opts.mmu is not None:
+        print('mmu: ', opts.zero_rate)
+        _obj.mmu = opts.mmu
 
     _obj.visible = True
 
@@ -336,6 +340,7 @@ def usage():
     _p.add_argument('-r', '--region', dest='region')
     _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
     _p.add_argument('--zero-rate', dest='zero_rate', type=float)
+    _p.add_argument('--mmu', dest='mmu', type=float)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
         help='run build_tiles_task.py after the map task is generated')
