@@ -270,8 +270,12 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         _obj.zero_rate = opts.zero_rate
         
     if opts.mmu is not None:
-        print('mmu: ', opts.zero_rate)
+        print('mmu: ', opts.mmu)
         _obj.mmu = opts.mmu
+        
+    if opts.weights is not None:
+        print('weights: ', opts.weights)
+        _obj.weights = opts.weights
 
     _obj.visible = True
 
@@ -340,6 +344,7 @@ def usage():
     _p.add_argument('-r', '--region', dest='region')
     _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
     _p.add_argument('--zero-rate', dest='zero_rate', type=float)
+    _p.add_argument('--weights', dest='weights')
     _p.add_argument('--mmu', dest='mmu', type=float)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \

@@ -458,8 +458,11 @@ class band:
             return agg_band.median(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _zero_rate)
 
         if _agg in ['dominated']:
-            _rate = float(opts.get('zero_rate', 0.20))
-            return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, False, _rate)
+            _wets = opts.get('weights')
+            if _wets:
+                import json
+                _wets = json.loads(_wets)
+            return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, _wets)
 
         if _agg == 'mean':
             _bnd_inp = self._load_block(bnd_out.scale(zoom))
@@ -468,11 +471,6 @@ class band:
 
             _bnd = agg_band.mean(_bnd_inp, bnd_out, 0, 100)
             _bnd.data[_bnd.data > 100] = _bnd.nodata
-
-            # add water pixels
-            # _bnd_inp.data[_bnd_inp.data <= 100] = 0
-            # _msk = agg_band.dominated(_bnd_inp, bnd_out, False)
-            # _bnd.data[_msk.data == 200] = 200
 
             return _bnd
 
@@ -492,7 +490,7 @@ class band:
             _mmu = opts.get('mmu', 0)
             if _mmu > 0:
                 from gio import mod_filter
-                mod_filter.filter_band_mmu(_bnd, num=3, area=_mmu)
+                mod_filter.filter_band_mmu(_bnd, num=5, area=_mmu)
 
             # _bnd.save('test_data2.tif')
 
