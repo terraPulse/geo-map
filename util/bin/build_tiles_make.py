@@ -176,6 +176,8 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     from gio import file_mag
 
     _f = file_mag.get(f_inp).get()
+    if not _f:
+        raise Exception('failed to load %s' % f_inp)
 
     # detect the extent of input file
     _ext = load_shp(_f) if f_inp.endswith('.shp') else load_img(_f, fzip)
