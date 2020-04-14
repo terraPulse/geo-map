@@ -490,7 +490,7 @@ class band:
             _mmu = opts.get('mmu', 0)
             if _mmu > 0:
                 from gio import mod_filter
-                mod_filter.filter_band_mmu(_bnd, num=3, area=_mmu)
+                mod_filter.filter_band_mmu(_bnd, num=5, area=_mmu)
 
             # _bnd.save('test_data2.tif')
 
