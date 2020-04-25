@@ -278,6 +278,14 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     if opts.weights is not None:
         print('weights: ', opts.weights)
         _obj.weights = opts.weights
+        
+    if opts.min_value is not None:
+        print('min_value: ', opts.min_value)
+        _obj.min_value = opts.min_value
+        
+    if opts.max_value is not None:
+        print('max_value: ', opts.max_value)
+        _obj.max_value = opts.max_value
 
     _obj.visible = True
 
@@ -347,7 +355,9 @@ def usage():
     _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
     _p.add_argument('--zero-rate', dest='zero_rate', type=float)
     _p.add_argument('--weights', dest='weights')
-    _p.add_argument('--mmu', dest='mmu', type=float)
+    _p.add_argument('--mmu', dest='mmu', type=int, default=1)
+    _p.add_argument('--min-value', dest='min_value', type=float)
+    _p.add_argument('--max-value', dest='max_value', type=float)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
         help='run build_tiles_task.py after the map task is generated')

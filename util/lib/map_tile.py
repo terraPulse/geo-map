@@ -487,10 +487,18 @@ class band:
             if _bnd is None:
                 return None
                 
+            _val = opts.get('min_value', None)
+            if _val is not None and _bnd.nodata is not None:
+                _bnd.data[_bnd.data < _val] = _bnd.nodata
+                
+            _val = opts.get('max_value', None)
+            if _val is not None and _bnd.nodata is not None:
+                _bnd.data[_bnd.data > _val] = _bnd.nodata
+                
             _mmu = opts.get('mmu', 0)
             if _mmu > 0:
                 from gio import mod_filter
-                mod_filter.filter_band_mmu(_bnd, num=5, area=_mmu)
+                mod_filter.filter_band_mmu(_bnd, num=_mmu)
 
             # _bnd.save('test_data2.tif')
 
