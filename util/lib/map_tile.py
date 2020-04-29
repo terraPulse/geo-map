@@ -326,8 +326,6 @@ class band:
             if len(_cs[i+1]) > 3:
                 _cs[i+1][-1] = max(_cs[i+1][-1], 80)
 
-            # print i, _cs[i]
-
         return _cs
 
     def _interp_colors_t(self, cs, v_val, scale=100, mag=1):
@@ -449,8 +447,9 @@ class band:
             if _bnd is None:
                 return None
 
-            if _agg == 'mean':
-                _bnd.data[_bnd.data > 100] = _bnd.nodata
+            # if _agg == 'mean':
+            #     _bnd.data[_bnd.data > 100] = _bnd.nodata
+            
             return _bnd
 
         if _agg in ['median']:
@@ -462,16 +461,21 @@ class band:
             if _wets:
                 import json
                 _wets = json.loads(_wets)
-            return agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, _wets)
+                
+            _bnd = agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, _wets)
+            _bnd.color_table = _bnd_inp.color_table
+            return _bnd
 
         if _agg == 'mean':
             _bnd_inp = self._load_block(bnd_out.scale(zoom))
             if _bnd_inp is None:
                 return None
-
-            _bnd = agg_band.mean(_bnd_inp, bnd_out, 0, 100)
-            _bnd.data[_bnd.data > 100] = _bnd.nodata
-
+                
+            _bnd = agg_band.mean(_bnd_inp, bnd_out)
+            _bnd.color_table = _bnd_inp.color_table
+            
+            # _bnd = agg_band.mean(_bnd_inp, bnd_out, 0, 100)
+            # _bnd.data[_bnd.data > 100] = _bnd.nodata
             return _bnd
 
         raise Exception('unknown aggregate option: %s' % _agg)
