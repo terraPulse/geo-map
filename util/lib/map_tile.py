@@ -462,8 +462,13 @@ class band:
                 import json
                 _wets = json.loads(_wets)
                 
-            _bnd = agg_band.dominated(self._load_block(bnd_out.scale(zoom)), bnd_out, _wets)
+            _bnd_inp = self._load_block(bnd_out.scale(zoom))
+            if _bnd_inp is None:
+                return None
+                
+            _bnd = agg_band.dominated(_bnd_inp, bnd_out, _wets)
             _bnd.color_table = _bnd_inp.color_table
+            
             return _bnd
 
         if _agg == 'mean':

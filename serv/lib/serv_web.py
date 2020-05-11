@@ -144,26 +144,6 @@ class map_obj(serv_base.service_base):
         return _rs[0] == 0
 
     def _dmap_mag_single(self, f, f_out):
-        # if len(_jobs) > 10 or f in _jobs:
-        #     logging.warning('exceed 10 tasks (%s)' % len(_jobs))
-        #     return
-
-        import re
-        _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f)
-        if not _m:
-            return
-
-        _lev = int(_m.group(2))
-        if _lev < self.min_level:
-            logging.warning('skip level %s < %s' % (_lev, self.min_level))
-            return
-
-        # _jobs.append(f)
-
-        _col = int(_m.group(3))
-        _row = int(_m.group(4))
-
-        logging.info('+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row))
         try:
             return self._dmap_single(f, f_out)
             # import time
@@ -191,7 +171,10 @@ class map_obj(serv_base.service_base):
         _valid_vals = None
         _solid_bg = False
         _mask = None
+        _min_level = self.min_level
 
+        logging.info('+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row))
+        
         if config.cfg.has_section(_tag):
             _inp = config.get(_tag, 'file', '')
             _pec = config.getint(_tag, 'percent', None)
@@ -210,6 +193,11 @@ class map_obj(serv_base.service_base):
 
                 _valid_vals = _met.get('valid_vals')
                 _mask = _met.get('mask')
+                _min_level = _met.get('min_dynamic_level', self.min_level)
+
+        if _lev < _min_level:
+            logging.warning('skip level %s < %s' % (_lev, _min_level))
+            return
 
         if _inp is None:
             return
