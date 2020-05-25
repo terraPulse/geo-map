@@ -357,7 +357,7 @@ def usage():
     _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
     _p.add_argument('-m', '--mask', dest='mask')
     _p.add_argument('-r', '--region', dest='region')
-    _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
+    _p.add_argument('-l', '--levels', dest='levels', default=[3, 5], nargs=2, type=int)
     _p.add_argument('--zero-rate', dest='zero_rate', type=float)
     _p.add_argument('--weights', dest='weights')
     _p.add_argument('--mmu', dest='mmu', type=int, default=0)
