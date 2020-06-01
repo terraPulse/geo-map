@@ -177,7 +177,14 @@ def _load_setting(tag):
     return _met.get('file')
     
 def loc(tag, lon, lat):
-    return _extract_pt(tag, lon, lat)
+    if not tag:
+        return None
+        
+    import re
+    _vs = []
+    for _t in re.split('[;,]', tag):
+        _vs.append(_extract_pt(_t, lon, lat))
+    return _vs
     
 def reg(tag, reg, cat=False):
     if not tag:
@@ -187,8 +194,12 @@ def reg(tag, reg, cat=False):
     if _mak is None:
         logging.warning('failed to create mask')
         return None
-        
-    return _extract_reg(tag, _mak, cat)
+    
+    import re
+    _vs = []
+    for _t in re.split('[;,]', tag):
+        _vs.append(_extract_reg(_t, _mak, cat))
+    return _vs
 
 def main(opts):
     from gio import config
