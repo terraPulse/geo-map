@@ -1,0 +1,213 @@
+'''
+File: identify_pixel.py
+Author: Min Feng
+Version: 0.1
+Create: 2016-04-30 02:09:18
+Description:
+'''
+
+def _geojson(txt):
+	from gio import geo_base as gb
+	from osgeo import ogr
+	import json
+
+# 	_g = ogr.CreateGeometryFromJson(str(json.dumps(txt)))
+	_g = ogr.CreateGeometryFromJson(str(txt))
+	if _g is None:
+		raise Exception('failed to parse GeoJSON data')
+	_g.AssignSpatialReference(gb.proj_from_epsg())
+
+	_b = gb.geo_polygon(_g)
+	return _b.project_to(gb.modis_projection())
+
+def _create_mak(ext, cell):
+    import math
+
+    _cols = int(math.ceil(ext.width() / cell))
+    _rows = int(math.ceil(ext.height() / cell))
+
+    if 0 in [_cols, _rows]:
+        raise Exception('failed to create the extent')
+        return None
+
+    _geo = [ext.minx, cell, 0, ext.maxy, 0, -cell]
+
+    from gio import geo_base as gb
+    from gio import geo_raster as ge
+    
+    return ge.geo_raster_info(_geo, _cols, _rows, gb.modis_projection())
+
+def _reg_mask(geo):
+    from gio import rasterize_band as rb
+    from gio import geo_raster as ge
+    import logging
+    
+    if not geo:
+        return None
+
+    _ext = geo.extent()
+
+    _dev = 10
+    _cel = max(_ext.height() / _dev, _ext.width() / _dev)
+    if _cel <= 0:
+        logging.warning('failed to create mask for the requested area')
+        return None
+        
+    _ext = _ext.buffer(_cel / 2.0)
+    _reg = _create_mak(_ext, _cel)
+    
+    if _reg == None:
+        logging.warning('failed to create mask for the requested area')
+        return None
+
+    from gio import file_unzip
+    with file_unzip.zip() as _zip:
+        _f_img = _zip.generate_file('', '.img')
+        _f_shp = _zip.generate_file('', '.shp')
+    
+        rb.rasterize_band(_reg, geo.buffer(_cel / 2.0), _f_img, _f_shp)
+        _mak = ge.open(_f_img).get_band().cache()
+        _mak.proj = geo.proj
+    
+        return _mak
+
+def _read(f, x, y):
+    from gio import geo_raster_ex as gx
+    from gio import geo_base as gb
+    from gio import geo_raster as ge
+
+    _shp = gx.geo_band_stack_zip.from_shapefile(f)
+    _val = _shp.read(gb.geo_point(x, y, ge.proj_from_epsg()))
+
+    return _val
+
+def _read_block(f, bnd):
+    if f.endswith('.shp'):
+        from gio import geo_raster_ex as gx
+        return gx.geo_band_stack_zip.from_shapefile(f).read_block(bnd)
+
+    from gio import geo_raster as ge
+    return ge.open(f).get_band().read_block(bnd)
+
+def _median(g):
+    # import logging
+    _vs = g.compressed().tolist()
+
+    # logging.info(_vs)
+    if len(_vs) == 0:
+        return None
+
+    _vs.sort()
+    return _vs[len(_vs) // 2]
+    
+def _categories(g):
+    _vs = g.compressed().tolist()
+
+    # logging.info(_vs)
+    if len(_vs) == 0:
+        return {}
+        
+    _ss = {}
+    for _v in _vs:
+        if _v not in _ss:
+            _ss[_v] = 0
+            
+        _ss[_v] += 1.0
+        
+    _rs = {}
+    
+    _tt = len(_vs)
+    if _tt <= 0:
+        return _rs
+     
+    for _k, _v in _ss.items():
+        _rs[_k] = round(_v/ _tt, 3)
+
+    return _rs
+
+def _extract_reg(tag, mak, cat=False):
+    from gio import config
+    import logging
+    import numpy.ma
+    
+    _f = _load_setting(tag)
+    if not _f:
+        logging.warning('failed to find the data layer (%s)' % tag)
+        return None
+
+    _bd = _read_block(_f, mak)
+    if not _bd:
+        logging.warning('failed to create mask')
+        return None
+        
+    _da = numpy.ma.array(_bd.data, mask=(mak.data != 1) | (_bd.data == _bd.nodata))
+    
+    if cat:
+        return _categories(_da)
+        
+    return [_median(_da)]
+    
+def _extract_pt(tag, lon, lat):
+    from gio import config
+    import logging
+
+    _f = _load_setting(tag)
+    if not _f:
+        return None
+
+    return [_read(_f, lon, lat)]
+    
+def _load_setting(tag):
+    import os
+    from gio import file_mag
+    from gio import config
+    import logging
+    
+    _f_ini = os.path.join(config.get('general', 'map_path'), tag, 'setting.ini')
+    if not file_mag.get(_f_ini).exists():
+        logging.warning('no setting file found for %s' % tag)
+        return None
+        
+    from gio import obj
+    _met = obj.load(file_mag.get(_f_ini).get())
+    
+    if not _met:
+        return None
+
+    return _met.get('file')
+    
+def loc(tag, lon, lat):
+    return _extract_pt(tag, lon, lat)
+    
+def reg(tag, reg, cat=False):
+    if not tag:
+        return None
+        
+    _mak = _reg_mask(_geojson(reg))
+    if _mak is None:
+        logging.warning('failed to create mask')
+        return None
+        
+    return _extract_reg(tag, _mak, cat)
+
+def main(opts):
+    from gio import config
+    
+    config.set('general', 'map_path', '/mnt/data1/mfeng/var/map')
+    
+    print(loc('global_tcc_2019_m', -76.85327814, 39.24435027))
+    
+    _geo = '{ "type": "Polygon", "coordinates": [ [ [ -76.85541629791258, 39.247044154820415 ], [ -76.85691833496094, 39.24661210203028 ], [ -76.85786247253418, 39.246213281707774 ], [ -76.85754060745239, 39.24536578099245 ], [ -76.85696125030518, 39.244800774826274 ], [ -76.85640335083006, 39.24488386425382 ], [ -76.85595273971558, 39.24543225200691 ], [ -76.85565233230591, 39.245781223799185 ], [ -76.85541629791258, 39.246362839594475 ], [ -76.85522317886353, 39.24664533695477 ], [ -76.85548067092896, 39.246944450566616 ], [ -76.85541629791258, 39.247044154820415 ] ] ] }'
+    
+    print(reg('global_tcc_2019_m', _geo))
+    print(reg('global_tcc_2019_m', _geo, True))
+
+def usage():
+    _p = environ_mag.usage(False)
+    
+    return _p
+
+if __name__ == '__main__':
+    from gio import environ_mag
+    environ_mag.init_path()
+    environ_mag.run(main, [environ_mag.config(usage())]) 

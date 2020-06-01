@@ -13,7 +13,25 @@ class op(serv_base.service_base):
 
     def __init__(self, request):
         serv_base.service_base.__init__(self, request)
-
+        
+    def _loc(self, tag, x, y, v):
+        logging.info('location query: tag (%s), pt (%s, %s)' % (tag, x, y))
+        
+        from . import identify_layer as il
+        return self.output_json(il.loc(tag, x, y))
+        
+    def _reg(self, tag, reg, v):
+        logging.info('reg query: tag (%s)' % (tag, ))
+        
+        from . import identify_layer as il
+        return self.output_json(il.reg(tag, reg))
+        
+    def _cat(self, tag, reg, v):
+        logging.info('cat query: tag (%s)' % (tag, ))
+        
+        from . import identify_layer as il
+        return self.output_json(il.reg(tag, reg, True))
+        
     def _ndvi(self, x, y, frm='png'):
         from . import mod_ndvi
         from gio import file_unzip
@@ -178,6 +196,28 @@ class op(serv_base.service_base):
             _reg = self.pp('reg')
 
             return self._pixel(_tag, _x, _y, _v, _reg)
+        
+        if path == 'query/loc':
+            _tag = self.pp('tag')
+            _v = self.pp('v', 'json')
+            _x = self.pf('x')
+            _y = self.pf('y')
+            
+            return self._loc(_tag, _x, _y, _v)
+            
+        if path == 'query/reg':
+            _tag = self.pp('tag')
+            _v = self.pp('v', 'json')
+            _geo = self.pp('geo')
+            
+            return self._reg(_tag, _geo, _v)
+            
+        if path == 'query/cat':
+            _tag = self.pp('tag')
+            _v = self.pp('v', 'json')
+            _geo = self.pp('geo')
+            
+            return self._cat(_tag, _geo, _v)
 
         if path == 'forest':
             _x = self.pf('x')
