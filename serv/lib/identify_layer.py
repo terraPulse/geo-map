@@ -47,7 +47,7 @@ def _reg_mask(geo):
 
     _ext = geo.extent()
 
-    _dev = 10
+    _dev = 100
     _cel = max(_ext.height() / _dev, _ext.width() / _dev)
     if _cel <= 0:
         logging.warning('failed to create mask for the requested area')
@@ -145,7 +145,7 @@ def _extract_reg(tag, mak, cat=False):
     if cat:
         return _categories(_da)
         
-    return [_median(_da)]
+    return _median(_da)
     
 def _extract_pt(tag, lon, lat):
     from gio import config
@@ -155,7 +155,7 @@ def _extract_pt(tag, lon, lat):
     if not _f:
         return None
 
-    return [_read(_f, lon, lat)]
+    return _read(_f, lon, lat)
     
 def _load_setting(tag):
     import os

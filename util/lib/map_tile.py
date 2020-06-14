@@ -276,11 +276,23 @@ class band:
         return _cs
 
     def _save(self, bnd, cs, f):
-        from . import mod_image
-        _dat = mod_image.convert(bnd, cs)
+        # from . import mod_image
+        from gio import geo_raster as ge
+        import numpy as np
+        
+        if self.translate_color:
+            _bnd = bnd.colorize_rgba(self.translate_color)
+            _dat = np.transpose(_bnd.data, [1, 2, 0])
+        else:
+            _bnd = bnd.colorize_rgba(cs)
+            _dat = np.transpose(_bnd.data, [1, 2, 0])
+            # _dat = mod_image.convert(bnd, cs)
 
-        import png
-        png.from_array(_dat, 'RGBA').save(f)
+        from PIL import Image
+        Image.fromarray(_dat, 'RGBA').save(f)
+        
+        # import png
+        # png.from_array(_dat, 'RGBA').save(f)
 
     def _load_color(self, f):
         import re
@@ -392,11 +404,6 @@ class band:
 
     def _load_block(self, mak):
         _bnd = self.bnd[0].read_block(mak)
-
-        if _bnd and self.translate_color:
-            from . import map_color
-            _bnd = map_color.colorize_band(_bnd, self.translate_color)
-
         return _bnd
 
     def _load_data(self, bnd_inp, bnd_out, zoom, perc=None, vals=None, agg=None, opts={}):
