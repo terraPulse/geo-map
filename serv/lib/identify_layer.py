@@ -129,6 +129,7 @@ def _extract_reg(tag, mak, cat=False):
     from gio import config
     import logging
     import numpy.ma
+    from . import map_values
     
     _f = _load_setting(tag)
     if not _f:
@@ -143,9 +144,17 @@ def _extract_reg(tag, mak, cat=False):
     _da = numpy.ma.array(_bd.data, mask=(mak.data != 1) | (_bd.data == _bd.nodata))
     
     if cat:
-        return _categories(_da)
+        _rs = _categories(_da)
+        if _rs is None:
+            return _rs
+            
+        _cs = {}
+        for _k, _v in _rs.items():
+            _cs[map_values.text(tag, None, _v)]
+            
+        return _cs
         
-    return _median(_da)
+    return map_values.text(tag, None, _median(_da))
     
 def _extract_pt(tag, lon, lat):
     from gio import config
@@ -155,7 +164,10 @@ def _extract_pt(tag, lon, lat):
     if not _f:
         return None
 
-    return _read(_f, lon, lat)
+    _v = _read(_f, lon, lat)
+    
+    from . import map_values
+    return map_values.text(tag, None, _v)
     
 def _load_setting(tag):
     import os

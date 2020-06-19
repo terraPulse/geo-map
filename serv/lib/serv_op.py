@@ -200,8 +200,8 @@ class op(serv_base.service_base):
         if path == 'query/loc':
             _tag = self.pp('tag')
             _v = self.pp('v', 'json')
-            _x = self.pf('x')
-            _y = self.pf('y')
+            _x = self.pf('lon', self.pf('x'))
+            _y = self.pf('lat', self.pf('y'))
             
             return self._loc(_tag, _x, _y, _v)
             
