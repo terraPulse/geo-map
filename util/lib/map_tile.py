@@ -281,10 +281,10 @@ class band:
         import numpy as np
         
         if self.translate_color:
-            _bnd = bnd.colorize_rgba(self.translate_color)
+            _bnd = bnd.colorize_rgba(self.translate_color, True)
             _dat = np.transpose(_bnd.data, [1, 2, 0])
         else:
-            _bnd = bnd.colorize_rgba(cs)
+            _bnd = bnd.colorize_rgba(cs, False)
             _dat = np.transpose(_bnd.data, [1, 2, 0])
             # _dat = mod_image.convert(bnd, cs)
 
