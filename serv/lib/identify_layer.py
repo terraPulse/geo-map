@@ -157,11 +157,11 @@ def _extract_reg(tag, mak, cat=False):
             
         _cs = {}
         for _k, _v in _rs.items():
-            _cs[map_values.text(tag, None, _v)]
+            _cs[map_values.text(tag, None, _f, _v)]
             
         return _cs
         
-    return map_values.text(tag, None, _median(_da))
+    return map_values.text(tag, None, _f, _median(_da))
     
 def _extract_pt(tag, lon, lat):
     from gio import config
@@ -174,7 +174,7 @@ def _extract_pt(tag, lon, lat):
     _v = _read(_f, lon, lat)
     
     from . import map_values
-    return map_values.text(tag, None, _v)
+    return map_values.text(tag, None, _f, _v)
     
 def _load_setting(tag):
     import os

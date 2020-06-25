@@ -1,4 +1,13 @@
 
+def ndvi(v):
+    if v is None:
+        return None
+        
+    if v < -1000:
+        return None
+        
+    return v / 1000.0
+
 def forest_loss(v):
     if v is None:
         return None
@@ -78,9 +87,12 @@ def map_value(tag, v):
     if tag == 'cdl':
         return cdl(v)
         
+    if tag == 'ndvi':
+        return ndvi(v)
+        
     return v
     
-def parse_tag(t, tag):
+def parse_tag(t, tag, f):
     if tag:
         return tag.lower().strip()
         
@@ -101,10 +113,13 @@ def parse_tag(t, tag):
     if 'cdl' in t:
         return 'cdl'
         
+    if 'ndvi' in t or 'ndsi' in t or 'ndwi' in t:
+        return 'ndvi'
+        
     return None
     
-def text(t, tag, v):
-    _v = map_value(parse_tag(t, tag), v)
+def text(t, tag, f, v):
+    _v = map_value(parse_tag(t, tag, f), v)
     
     if _v is None:
         return '-'
