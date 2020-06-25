@@ -75,11 +75,18 @@ def _read(f, x, y):
     from gio import geo_raster_ex as gx
     from gio import geo_base as gb
     from gio import geo_raster as ge
-
-    _shp = gx.geo_band_stack_zip.from_shapefile(f)
-    _val = _shp.read(gb.geo_point(x, y, ge.proj_from_epsg()))
-
-    return _val
+    
+    if f.endswith('.shp'):
+        _shp = gx.geo_band_stack_zip.from_shapefile(f)
+        return _shp.read(gb.geo_point(x, y, ge.proj_from_epsg()))
+        
+    _bnd = ge.open(f)
+    if _bnd is None:
+        return None
+        
+    _bnd = _bnd.get_band()
+    _pt = gb.geo_point(x, y, ge.proj_from_epsg()).project_to(_bnd.proj)
+    return _bnd.read_location(_pt.x, _pt.y)
 
 def _read_block(f, bnd):
     if f.endswith('.shp'):

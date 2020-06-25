@@ -107,6 +107,6 @@ def text(t, tag, v):
     _v = map_value(parse_tag(t, tag), v)
     
     if _v is None:
-        return None
+        return '-'
         
     return '%s' % _v
