@@ -56,18 +56,20 @@ class tiles:
 def _mask_grid(bnd, f, fzip):
     from gio import rasterize_band as rb
     from gio import geo_base as gb
+    from gio import file_mag
     
-    _pol = [_p for _p, _a in gb.load_shp(f)]
+    _pol = [_p for _p, _a in gb.load_shp(file_mag.get(f).get(), ext=bnd.extent().to_polygon())]
     _msk = rb.to_mask(bnd, _pol)
+    _shp = bnd.data.shape
     
-    if len(bnd.shape) == 2:
+    if len(_shp) == 2:
         if bnd.nodata is None:
             raise Exception('nodata needs to be set for the input raster')
         bnd.data[_msk.data != 1] = bnd.nodata
         return
     
-    if len(bnd.shape) == 3:
-        if bnd.shape[0] != 4:
+    if len(_shp) == 3:
+        if _shp[0] != 4:
             raise Exception('no transparency band provided')
             
         bnd.data[3, :, :] = 0
@@ -87,6 +89,8 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         _d = os.path.join(d_out, 'tiles', str(lev), str(col))
         
     _f = os.path.join(_d, '%s.png' % row)
+    logging.info('generating tile at %s' % _f)
+    
     if file_mag.get(_f).exists():
         logging.debug('skip %s' % _f)
         return

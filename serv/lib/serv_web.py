@@ -153,6 +153,9 @@ class map_obj(serv_base.service_base):
             # _jobs.pop()
 
     def _load_setting(self, f_inp):
+        import re
+        import os
+        
         _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f_inp)
 
         _tag = _m.group(1)
@@ -161,15 +164,18 @@ class map_obj(serv_base.service_base):
         _row = int(_m.group(4))
         
         from gio import obj
-        _met = obj.obj()
+        from gio import config
+        from gio import file_mag
+        from gio import obj
         
         _out = os.path.join(config.get('general', 'map_path'), _tag)
-        _f_ini = os.path.join(_out, 'setting.ini')
+        _f_ini = file_mag.get(os.path.join(_out, 'setting.ini')).get()
         
-        if file_mag.get(_f_ini).exists():
-            from gio import obj
-            _met = obj.load(file_mag.get(_f_ini).get())
-            
+        if _f_ini:
+            _met = obj.load(_f_ini)
+        else:
+            _met = obj.obj()
+        
         _met.lev = _lev
         _met.row = _row
         _met.col = _col
@@ -225,7 +231,7 @@ class map_obj(serv_base.service_base):
             _clr = os.path.join(_out, 'color.txt')
 
         from geo_map_util import map_tile
-        map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg, opts=_met)
+        map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg, opts=met)
 
         logging.debug('generated tile %s' % f_inp)
 
@@ -290,9 +296,10 @@ class map_obj(serv_base.service_base):
         
         _met = self._load_setting(_loc)
         if _met.get('version', 1.0) >= 2.0:
-            _d_web = os.path.join(_d_web, 'tiles')
+            _out = os.path.join(_d_web, _met.tag, 'tiles', '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
+        else:
+            _out = os.path.join(_d_web, _met.tag, '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
             
-        _out = self._format_path(os.path.join(_d_web, _loc if _loc else path))
         logging.info('request tile %s' % _out)
 
         if not _out.endswith('.png'):
@@ -308,13 +315,12 @@ class map_obj(serv_base.service_base):
                 config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
                 
             if not file_mag.get(_out).exists():
-                logging.info('generate tile %s' % _out)
                 logging.debug('generating map tile (%s)' % _out)
                 self._dmap_mag_single(_loc, _met)
 
                 logging.info('get tile %s' % _out)
                 if not file_mag.get(_out).exists():
-                    _out = config.get_at('general', 'nodata_file')
+                    _out = config.get('general', 'nodata_file')
 
             return self.output_file(_out)
 
