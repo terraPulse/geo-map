@@ -1,7 +1,7 @@
 
 FROM minfeng/landsat-util:latest
 
-RUN pip install pypng
+RUN pip install pillow
 
 LABEL creator Min Feng
 ENV DEBIAN_FRONTEND noninteractive

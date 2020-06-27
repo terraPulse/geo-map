@@ -54,37 +54,26 @@ class tiles:
         return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
 def _mask_grid(bnd, f, fzip):
-    _f_out = fzip.generate_file('', '.tif')
+    from gio import rasterize_band as rb
+    from gio import geo_base as gb
     
-    from gio import geo_raster as ge
-    import numpy as np
+    _pol = [_p for _p, _a in gb.load_shp(f)]
+    _msk = rb.to_mask(bnd, _pol)
     
-    _dat = np.zeros((bnd.height, bnd.width), dtype=np.uint8)
-    _bnd = bnd.from_grid(_dat)
-    _bnd.pixel_type = ge.pixel_type()
-    _bnd.save(_f_out)
+    if len(bnd.shape) == 2:
+        if bnd.nodata is None:
+            raise Exception('nodata needs to be set for the input raster')
+        bnd.data[_msk.data != 1] = bnd.nodata
+        return
     
-    from osgeo import ogr
-    from gio import run_commands
-    from gio import file_mag
-
-    _f_inp = file_mag.get(f).get()
-    _f_shp = _f_inp
-
-    _shp = ogr.Open(_f_inp)
-    _lyr = _shp.GetLayer()
-
-    if not _lyr.GetSpatialRef().IsSame(_bnd.proj):
-        _f_shp = fzip.generate_file('', '.shp')
-
-        _cmd = 'ogr2ogr -t_srs "%s" %s %s' % (_bnd.proj.ExportToProj4(), _f_shp, _f_inp)
-        run_commands.run(_cmd)
-
-    _cmd = 'gdal_rasterize -at -burn 1 %s %s' % (_f_shp, _f_out)
-    run_commands.run(_cmd)
-
-    _bbb = ge.open(_f_out).get_band().cache()
-    bnd.data[_bbb.data != 1] = bnd.nodata
+    if len(bnd.shape) == 3:
+        if bnd.shape[0] != 4:
+            raise Exception('no transparency band provided')
+            
+        bnd.data[3, :, :] = 0
+        return
+    
+    raise Exception('failed to recognize the image type')
 
 def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
     # from osgeo import gdal
@@ -92,8 +81,11 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
     import os
     from gio import file_mag
 
-    _d = os.path.join(d_out, str(lev), str(col))
-
+    if opts.get('version', 1.0) < 2.0:
+        _d = os.path.join(d_out, str(lev), str(col))
+    else:
+        _d = os.path.join(d_out, 'tiles', str(lev), str(col))
+        
     _f = os.path.join(_d, '%s.png' % row)
     if file_mag.get(_f).exists():
         logging.debug('skip %s' % _f)
@@ -229,25 +221,6 @@ class band:
             _bnd = [x for x in [_img.get_band(_b + 1) for _b in range(_img.band_num)] if x is not None]
             return _bnd
             
-        # _f_shp = f
-        # if lev > 6:
-        #     import os
-        #     import sys
-        #     from gio import run_commands
-            
-        #     if f.endswith('.shp'):
-        #         from gio import file_mag
-        #         _f_shp = fzip.generate_file('', '.shp')
-        #         _cmd = 'ogr2ogr -spat %s %s %s %s %s %s' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, file_mag.get(f).get())
-        #         run_commands.run(_cmd, env=os.environ, stdout=sys.stdout, stderr=sys.stderr)
-                
-        #     elif f.startswith('PG:'):
-        #         _f_shp = fzip.generate_file('', '.shp')
-        #         _cmd = 'ogr2ogr -spat %s %s %s %s %s PG:"%s"' % (e.minx, e.miny, e.maxx, e.maxy, _f_shp, f[3:])
-        #         run_commands.run(_cmd, env=os.environ, stdout=sys.stdout, stderr=sys.stderr)
-        #     else:
-        #         pass
-            
         _bnd = gx.geo_band_stack_zip.from_shapefile(f, file_unzip=fzip, extent=ext)
         if _bnd is not None:
             return [_bnd]
@@ -282,17 +255,17 @@ class band:
         
         if self.translate_color:
             _bnd = bnd.colorize_rgba(self.translate_color, True)
-            _dat = np.transpose(_bnd.data, [1, 2, 0])
         else:
             _bnd = bnd.colorize_rgba(cs, False)
-            _dat = np.transpose(_bnd.data, [1, 2, 0])
-            # _dat = mod_image.convert(bnd, cs)
-
+            
+        self._save_rgb(_bnd.data, f)
+        
+    def _save_rgb(self, dat, f):
+        import numpy as np
+        _dat = np.transpose(dat, [1, 2, 0])
+        
         from PIL import Image
         Image.fromarray(_dat, 'RGBA').save(f)
-        
-        # import png
-        # png.from_array(_dat, 'RGBA').save(f)
 
     def _load_color(self, f):
         import re
@@ -530,6 +503,29 @@ class band:
             return [_bnd]
         else:
             return [self.bnd[_b].read_block(bnd) for _b in range(len(self.bnd))]
+            
+    def _img_to_png(self, bnds, f):
+        import numpy as np
+        
+        _msk = bnds[0]
+        
+        _dat = np.empty((4, _msk.height, _msk.width), dtype=np.uint8)
+        _dat.fill(255)
+        
+        for _b in range(min(4, len(bnds))):
+            _dat[_b, :, :] = bnds[_b].data
+            
+        if self.mask is not None:
+            _msk = self.mask.read_block(msk)
+            if _msk:
+                _dat[3, :, :][_msk.data != 1] = 0
+
+        if self.region is not None:
+            from gio import file_unzip as fzip
+            with fzip.zip() as _zip:
+                _mask_grid(_msk.from_grid(_dat), self.region, _zip)
+            
+        self._save_rgb(_dat, f)
 
     def _save_band(self, bnd, cs, f_out):
         if cs == None or list(cs.keys()) == 0:
@@ -537,31 +533,24 @@ class band:
 
         if len(bnd) == 0:
             return
+        
+        if len(bnd) > 1:
+            return self._img_to_png(bnd, f_out)
+            
+        if bnd[0] == None:
+            return
 
-        if len(bnd) == 1:
-            if bnd[0] == None:
-                return
+        if self.mask is not None:
+            _msk = self.mask.read_block(bnd[0])
+            if _msk:
+                bnd[0].data[_msk.data != 1] = bnd[0].nodata
 
-            if self.mask is not None:
-                _msk = self.mask.read_block(bnd[0])
-                if _msk:
-                    bnd[0].data[_msk.data != 1] = bnd[0].nodata
+        if self.region is not None:
+            from gio import file_unzip as fzip
+            with fzip.zip() as _zip:
+                _mask_grid(bnd[0], self.region, _zip)
 
-            if self.region is not None:
-                from gio import file_unzip as fzip
-                with fzip.zip() as _zip:
-                    _mask_grid(bnd[0], self.region, _zip)
-
-            self._save(bnd[0], cs, f_out)
-        else:
-            from osgeo import gdal
-            _img = gdal.GetDriverByName('PNG').Create(f_out, bnd[0].width,\
-                    bnd[0].height, len(self.bnd), gdal.GDT_Byte)
-
-            for _b in range(len(self.bnd)):
-                _img.get_band(_b+1).write(self.bnd[_b].read_block(bnd[0]).data, 0, 0)
-
-            _img.flush()
+        self._save(bnd[0], cs, f_out)
             
     def make(self, bnd, f_clr, f_out, agg=None, opts={}):
         _bnd = self._load_band(bnd, agg=agg, opts=opts)

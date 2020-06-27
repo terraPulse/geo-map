@@ -55,11 +55,12 @@ def main(opts):
         _met = obj.load(file_mag.get(_f_ini).get())
 
     multi_task.run(_make_tile, _tt, opts, (_met, opts, ))
+    print()
 
 def usage():
     _p = environ_mag.usage(True)
 
-    _p.add_argument('-i', '--input', dest='input')
+    _p.add_argument('-d', '-i', '--input', dest='input')
     _p.add_argument('-t', '--tag', dest='tag', required=True)
     _p.add_argument('-o', '--output', dest='output')
     _p.add_argument('-c', '--cache', dest='cache')

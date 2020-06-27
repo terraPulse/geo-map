@@ -143,29 +143,53 @@ class map_obj(serv_base.service_base):
 
         return _rs[0] == 0
 
-    def _dmap_mag_single(self, f, f_out):
+    def _dmap_mag_single(self, f, met):
         try:
-            return self._dmap_single(f, f_out)
+            return self._dmap_single(f, met)
             # import time
             # time.sleep(2.0)
         finally:
             pass
             # _jobs.pop()
 
-    def _dmap_single(self, f_inp, f_out):
-        from gio import config
-        from gio import file_mag
-        import os
-        import re
-
+    def _load_setting(self, f_inp):
         _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f_inp)
 
         _tag = _m.group(1)
         _lev = int(_m.group(2))
         _col = int(_m.group(3))
         _row = int(_m.group(4))
+        
+        from gio import obj
+        _met = obj.obj()
+        
+        _out = os.path.join(config.get('general', 'map_path'), _tag)
+        _f_ini = os.path.join(_out, 'setting.ini')
+        
+        if file_mag.get(_f_ini).exists():
+            from gio import obj
+            _met = obj.load(file_mag.get(_f_ini).get())
+            
+        _met.lev = _lev
+        _met.row = _row
+        _met.col = _col
+        _met.tag = _tag
+        
+        return _met
+                
+    def _dmap_single(self, f_inp, met):
+        from gio import config
+        from gio import file_mag
+        import os
+        import re
+
+        _tag = met.tag
+        _lev = met.getint('lev')
+        _col = met.getint('col')
+        _row = met.getint('row')
 
         _out = os.path.join(config.get('general', 'map_path'), _tag)
+        
         _inp = None
         _agg = None
         _valid_vals = None
@@ -179,21 +203,16 @@ class map_obj(serv_base.service_base):
             _inp = config.get(_tag, 'file', '')
             _pec = config.getint(_tag, 'percent', None)
             _clr = config.get(_tag, 'color', None)
-        else:
-            _f_ini = os.path.join(_out, 'setting.ini')
-            if file_mag.get(_f_ini).exists():
-                from gio import obj
-                _met = obj.load(file_mag.get(_f_ini).get())
+            
+        _inp = met.get('file')
+        _pec = met.getint('percent')
+        _clr = met.get('color')
+        _solid_bg = met.get('solid_bg')
+        _agg = met.get('agg')
 
-                _inp = _met.get('file')
-                _pec = _met.getint('percent')
-                _clr = _met.get('color')
-                _solid_bg = _met.get('solid_bg')
-                _agg = _met.get('agg')
-
-                _valid_vals = _met.get('valid_vals')
-                _mask = _met.get('mask')
-                _min_level = _met.get('min_dynamic_level', self.min_level)
+        _valid_vals = met.get('valid_vals')
+        _mask = met.get('mask')
+        _min_level = met.get('min_dynamic_level', self.min_level)
 
         if _lev < _min_level:
             logging.warning('skip level %s < %s' % (_lev, _min_level))
@@ -267,35 +286,37 @@ class map_obj(serv_base.service_base):
         
         logging.info('map path: %s' % _d_web)
 
-        # if file_mag.get(os.path.join(_d_web, _q) if _q else _d_web).exists():
-        if True:
-            _pp = self._normalize_path(path)
-            _f = self._format_path(os.path.join(_d_web, _pp if _pp else path))
+        _loc = self._normalize_path(path)
+        
+        _met = self._load_setting(_loc)
+        if _met.get('version', 1.0) >= 2.0:
+            _d_web = os.path.join(_d_web, 'tiles')
             
-            logging.info('request tile %s' % _f)
+        _out = self._format_path(os.path.join(_d_web, _loc if _loc else path))
+        logging.info('request tile %s' % _out)
 
-            if not _f.endswith('.png'):
-                raise Exception('failed to find %s' % _pp)
-                
-            from gio import file_unzip
-            from gio import config
+        if not _out.endswith('.png'):
+            raise Exception('failed to find %s' % _loc)
             
-            with file_unzip.zip() as _zip:
-                _cache = config.get('conf', 'cache', None)
-                if not _cache:
-                    _tmp = _zip.generate_file()
-                    config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
-                    
-                if not file_mag.get(_f).exists():
-                    logging.info('generate tile %s' % _f)
-                    logging.debug('generating map tile (%s)' % _f)
-                    self._dmap_mag_single(_pp, _f)
-    
-                    logging.info('get tile %s' % _f)
-                    if not file_mag.get(_f).exists():
-                        _f = config.get_at('general', 'nodata_file')
-    
-                return self.output_file(_f)
+        from gio import file_unzip
+        from gio import config
+        
+        with file_unzip.zip() as _zip:
+            _cache = config.get('conf', 'cache', None)
+            if not _cache:
+                _tmp = _zip.generate_file()
+                config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+                
+            if not file_mag.get(_out).exists():
+                logging.info('generate tile %s' % _out)
+                logging.debug('generating map tile (%s)' % _out)
+                self._dmap_mag_single(_loc, _met)
+
+                logging.info('get tile %s' % _out)
+                if not file_mag.get(_out).exists():
+                    _out = config.get_at('general', 'nodata_file')
+
+            return self.output_file(_out)
 
         # _zips = load_zips()
         # if _p not in _zips.keys():

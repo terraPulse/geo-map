@@ -70,7 +70,11 @@ class color_table:
             _f = color_table.load_sample(f)
 
         from gio import geo_raster as ge
-        _b = ge.open(fzip.unzip(_f)).get_band()
+        _m = ge.open(fzip.unzip(_f))
+        if _m.band_num > 1:
+            return color_table({})
+        
+        _b = _m.get_band()
 
         if _b.color_table is None:
             return None
@@ -293,6 +297,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         _obj.min_dynamic_level = _min_dynamic_level
 
     _obj.visible = True
+    _obj.version = opts.version
 
     if agg:
         _obj.agg = agg
@@ -307,7 +312,6 @@ def main(opts):
     gdal.UseExceptions()
 
     from gio import config
-
     import os
     
     _d_out = os.path.join(config.get('conf', 'output'), opts.tag)
@@ -332,7 +336,7 @@ def main(opts):
     if opts.execute:
         print('generate map tiles')
 
-        _cmd = 'build_tiles_task.py -t %s ' % opts.tag
+        _cmd = 'build_tiles_task.py -t %s -i %s ' % (opts.tag, config.get('conf', 'output'))
         # _agg = ' -a %s ' % opts.agg if opts.agg else ''
         _tsk = '-in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
                 opts.instance_num, opts.instance_pos, opts.task_num, \
@@ -346,7 +350,7 @@ def usage():
     _p = environ_mag.usage(True)
 
     _p.add_argument('-i', '--input', dest='input', required=True)
-    _p.add_argument('-o', '--output', dest='output')
+    _p.add_argument('-d', '-o', '--output', dest='output')
     _p.add_argument('-c', '--color', dest='color')
     _p.add_argument('--translate-color', dest='translate_color')
     _p.add_argument('-t', '--tag', dest='tag', required=True)
@@ -363,6 +367,7 @@ def usage():
     _p.add_argument('--mmu', dest='mmu', type=int, default=0)
     _p.add_argument('--min-value', dest='min_value', type=float)
     _p.add_argument('--max-value', dest='max_value', type=float)
+    _p.add_argument('--version', dest='version', type=float, default=2.0)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
         help='run build_tiles_task.py after the map task is generated')
