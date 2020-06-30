@@ -157,7 +157,7 @@ def _extract_reg(tag, mak, cat=False):
             
         _cs = {}
         for _k, _v in _rs.items():
-            _cs[map_values.text(tag, None, _f, _v)]
+            _cs[map_values.text(tag, None, _f, _k)] = _v
             
         return _cs
         
