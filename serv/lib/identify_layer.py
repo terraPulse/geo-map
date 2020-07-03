@@ -128,7 +128,7 @@ def _categories(g):
         return _rs
      
     for _k, _v in _ss.items():
-        _rs[_k] = round(_v/ _tt, 3)
+        _rs[_k] = round(_v / _tt, 3)
 
     return _rs
 
@@ -156,8 +156,8 @@ def _extract_reg(tag, mak, cat=False):
             return _rs
             
         _cs = {}
-        for _k, _v in _rs.items():
-            _cs[map_values.text(tag, None, _f, _k)] = _v
+        for _k in sorted(_rs.keys()):
+            _cs[map_values.text(tag, None, _f, _k)] = _rs[_k]
             
         return _cs
         

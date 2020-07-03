@@ -34,13 +34,13 @@ def forest_esta(v):
         return 'non-forest' 
         
     if v == 0:
-        return '<1970'
+        return 1970
     
     return 1970 + v
     
 def tcc(v):
     if v <= 100:
-        return '%s%%' % v
+        return v
     
     if v == 200:
         return 'water'
@@ -124,4 +124,4 @@ def text(t, tag, f, v):
     if _v is None:
         return '-'
         
-    return '%s' % _v
+    return _v

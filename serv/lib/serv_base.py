@@ -44,8 +44,9 @@ class service_base:
         from . import model_data
 
         from flask import make_response
-        _text = json.dumps(obj, default=model_data.convert_to_builtin_type,
-                indent=2, ensure_ascii=False, sort_keys=True)
+        # _text = json.dumps(obj, default=model_data.convert_to_builtin_type,
+        #         indent=2, ensure_ascii=False, sort_keys=True)
+        _text = json.dumps(obj, indent=2, ensure_ascii=False)
         _resp = make_response(_text)
         _resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
