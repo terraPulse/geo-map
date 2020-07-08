@@ -22,7 +22,7 @@ def load_shp(f):
     from gio import file_mag
     from gio import geo_base as gb
 
-    _shp = ogr.Open(file_mag.get(f).get())
+    _shp = ogr.Open(f)
     if _shp is None:
         raise Exception('Failed to load shapefile ' + f)
 
@@ -66,7 +66,7 @@ class color_table:
         _ext = os.path.splitext(f.lower())[1]
 
         _f = f
-        if _ext == '.shp':
+        if _ext == '.shp' or f.startswith('PG:'):
             _f = color_table.load_sample(f)
 
         from gio import geo_raster as ge
@@ -123,7 +123,8 @@ class color_table:
 
         _lyr = _shp.GetLayer()
         for _f in _lyr:
-            return _f.items()['FILE']
+            _is = _f.items()
+            return _is.get('FILE', _is.get('file'))
 
         raise None
 
@@ -179,12 +180,12 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     import os
     from gio import file_mag
 
-    _f = file_mag.get(f_inp).get()
+    _f = f_inp if f_inp.startswith('PG:') else file_mag.get(f_inp).get()
     if not _f:
         raise Exception('failed to load %s' % f_inp)
 
     # detect the extent of input file
-    _ext = load_shp(_f) if f_inp.endswith('.shp') else load_img(_f, fzip)
+    _ext = load_shp(_f) if f_inp.endswith('.shp') or f_inp.upper().startswith('PG:') else load_img(_f, fzip)
     if opts.region:
         _rrr = load_shp(opts.region)
         _ext = _ext.intersect(_rrr)
@@ -321,7 +322,7 @@ def main(opts):
     from gio import file_unzip
     with file_unzip.file_unzip() as _zip:
         _f_inp = config.get('conf', 'input')
-        if not _f_inp.startswith('s3://'):
+        if not (_f_inp.startswith('s3://') or _f_inp.startswith('PG:')):
             _f_inp = os.path.abspath(_f_inp)
         
         _d_tmp = _zip.generate_file()
