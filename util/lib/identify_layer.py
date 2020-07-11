@@ -89,7 +89,7 @@ def _read(f, x, y):
     return _bnd.read_location(_pt.x, _pt.y)
 
 def _read_block(f, bnd):
-    if f.endswith('.shp'):
+    if f.endswith('.shp') or f.startswith('PG:'):
         from gio import geo_raster_ex as gx
         return gx.geo_band_stack_zip.from_shapefile(f).read_block(bnd)
 
