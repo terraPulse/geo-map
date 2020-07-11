@@ -76,7 +76,7 @@ def _read(f, x, y):
     from gio import geo_base as gb
     from gio import geo_raster as ge
     
-    if f.endswith('.shp'):
+    if f.endswith('.shp') or f.startswith('PG:'):
         _shp = gx.geo_band_stack_zip.from_shapefile(f)
         return _shp.read(gb.geo_point(x, y, ge.proj_from_epsg()))
         
