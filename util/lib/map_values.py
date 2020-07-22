@@ -125,3 +125,20 @@ def text(t, tag, f, v):
         return '-'
         
     return _v
+
+def categories(t, tag, f, cs):
+    if cs is None:
+        return None
+        
+    _tag = parse_tag(t, tag, f)
+    
+    if _tag == 'tcc':
+        _cs = {}
+        for _v in range(101):
+            _cs[_v] = cs.get(_v, 0)
+        return _cs
+    
+    return cs
+            
+        
+    

@@ -161,7 +161,7 @@ def _extract_reg(tag, mak, cat=False):
         for _k in sorted(_rs.keys()):
             _cs[map_values.text(tag, None, _f, _k)] = _rs[_k]
             
-        return _cs
+        return map_values.categories(tag, None, _f, _cs)
         
     return map_values.text(tag, None, _f, _median(_da))
     
