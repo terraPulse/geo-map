@@ -201,6 +201,7 @@ class band:
         if self.bnd is None:
             return
         
+        self.level = lev
         self.color = self.bnd[0].color_table if len(self.bnd) == 1 else None
         self.solid_bg = solid_bg
         self.translate_color = opts.get('translate_color', None)
@@ -506,26 +507,30 @@ class band:
         
         if 'burn_band' in opts:
             _opts = opts.get('burn_band', {})
-            _clrs = _opts.get('color')
-            _finp = _opts.get('input')
-            _offs = _opts.get('offset', 200)
-            
-            logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
-            
-            from gio import band_op
-            _bnd = band_op.burn_band(_bnd, None, _finp, _clrs, _offs)
+            _mlev = _opts.getint('level', 1)
+            if self.level >= _mlev:
+                _clrs = _opts.get('color')
+                _finp = _opts.get('input')
+                _offs = _opts.get('offset', 200)
+                
+                logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
+                
+                from gio import band_op
+                _bnd = band_op.burn_band(_bnd, None, _finp, _clrs, _offs)
             
         if 'burn_transparency' in opts:
             _opts = opts.get('burn_transparency', {})
-            _clrs = _opts.get('color', None)
-            _finp = _opts.get('input')
-            _vmin = float(_opts.get('value_min'))
-            _vmax = float(_opts.get('value_max'))
-            
-            logging.debug('burn transparency %s, %s, %s' % (_finp, _vmin, _vmax))
-            
-            from gio import band_op
-            _bnd = band_op.burn_transparency(_bnd, None, _finp, _vmin, _vmax)
+            _mlev = _opts.getint('level', 1)
+            if self.level >= _mlev:
+                _clrs = _opts.get('color', None)
+                _finp = _opts.get('input')
+                _vmin = _opts.getfloat('value_min')
+                _vmax = _opts.getfloat('value_max')
+                
+                logging.debug('burn transparency %s, %s, %s' % (_finp, _vmin, _vmax))
+                
+                from gio import band_op
+                _bnd = band_op.burn_transparency(_bnd, None, _finp, _vmin, _vmax)
         
         return _bnd
             

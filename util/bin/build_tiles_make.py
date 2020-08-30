@@ -385,10 +385,12 @@ def usage():
     _p.add_argument('--burn-band-input', dest='burn_band_input')
     _p.add_argument('--burn-band-color', dest='burn_band_color')
     _p.add_argument('--burn-band-offset', dest='burn_band_offset', type=int, default=250)
+    _p.add_argument('--burn-band-level', dest='burn_band_level', type=int, default=1)
     
     _p.add_argument('--burn-transparency-input', dest='burn_transparency_input')
     _p.add_argument('--burn-transparency-value-min', dest='burn_transparency_value_min', type=float, default=0)
     _p.add_argument('--burn-transparency-value-max', dest='burn_transparency_value_max', type=float, default=100)
+    _p.add_argument('--burn-transparency-level', dest='burn_transparency_level', type=int, default=1)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
         help='run build_tiles_task.py after the map task is generated')
