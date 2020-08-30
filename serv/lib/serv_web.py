@@ -20,7 +20,7 @@ class web(serv_base.service_base):
         _fs = []
         for _d in sorted(os.listdir(_d_map)):
             _f = os.path.join(_d_map, _d, 'setting.ini')
-            logging.info('loading %s' % _f)
+            logging.debug('loading %s' % _f)
             if os.path.exists(_f):
                 _obj = obj.load(_f)
 
@@ -31,7 +31,7 @@ class web(serv_base.service_base):
                 _lin = '\tmap.addLayer(create_layer(\'/map/%s\', \'%s\'));' % (_d, _tit)
                 _fs.append(_lin)
 
-                logging.info('add layer %s: %s' % (_tit, _d))
+                logging.debug('add layer %s: %s' % (_tit, _d))
 
         if len(_fs) == 0:
             return f
@@ -61,7 +61,7 @@ class web(serv_base.service_base):
             logging.error('no file found %s' % _f_res)
             return
 
-        logging.info('loading web path: ' + path)
+        logging.debug('loading web path: ' + path)
         if re.search('js/map.*\.js', _f_res):
             with file_unzip.file_unzip() as _zip:
                 return self.output_file(self._add_maps(_f_res, _zip))

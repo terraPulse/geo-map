@@ -305,6 +305,18 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
 
     if f_tclr:
         _obj.translate_color = os.path.abspath(f_tclr) if os.path.exists(f_tclr) else f_tclr
+        
+    if opts.burn_band_input:
+        _obj.burn_band.input = opts.burn_band_input
+        if opts.burn_band_color:
+            _obj.burn_band.color = opts.burn_band_color
+        if opts.burn_band_offset is not None:
+            _obj.burn_band.offset = opts.burn_band_offset
+            
+    if opts.burn_transparency_input:
+        _obj.burn_transparency.input = opts.burn_transparency_input
+        _obj.burn_transparency.value_min = opts.burn_transparency_value_min
+        _obj.burn_transparency.value_max = opts.burn_transparency_value_max
 
     _obj.save(os.path.join(d_out, 'setting.ini'))
 
@@ -369,6 +381,14 @@ def usage():
     _p.add_argument('--min-value', dest='min_value', type=float)
     _p.add_argument('--max-value', dest='max_value', type=float)
     _p.add_argument('--version', dest='version', type=float, default=2.0)
+    
+    _p.add_argument('--burn-band-input', dest='burn_band_input')
+    _p.add_argument('--burn-band-color', dest='burn_band_color')
+    _p.add_argument('--burn-band-offset', dest='burn_band_offset', type=int, default=250)
+    
+    _p.add_argument('--burn-transparency-input', dest='burn_transparency_input')
+    _p.add_argument('--burn-transparency-value-min', dest='burn_transparency_value_min', type=float, default=0)
+    _p.add_argument('--burn-transparency-value-max', dest='burn_transparency_value_max', type=float, default=100)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
         help='run build_tiles_task.py after the map task is generated')

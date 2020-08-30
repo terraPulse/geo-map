@@ -89,7 +89,7 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         _d = os.path.join(d_out, 'tiles', str(lev), str(col))
         
     _f = os.path.join(_d, '%s.png' % row)
-    logging.info('generating tile at %s' % _f)
+    logging.debug('generating tile at %s' % _f)
     
     if file_mag.get(_f).exists():
         logging.debug('skip %s' % _f)
@@ -120,7 +120,7 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         else:
             band(_finp, lev, _ext, f_msk, solid_bg, opts, _zip).make(_ext, \
                     f_clr, _f_tmp, agg=agg, opts=opts)
-        
+                    
         file_unzip.compress_folder(_d_tmp, os.path.dirname(_f), [])
 
 class color_table:
@@ -252,8 +252,7 @@ class band:
 
         return _cs
 
-    def _save(self, bnd, cs, f):
-        # from . import mod_image
+    def _save(self, bnd, cs, f, opts):
         from gio import geo_raster as ge
         import numpy as np
         
@@ -262,15 +261,9 @@ class band:
         else:
             _bnd = bnd.colorize_rgba(cs, False)
             
-        self._save_rgb(_bnd.data, f)
+        _bnd = self._burn(_bnd, opts)
+        _bnd.to_image().save(f)
         
-    def _save_rgb(self, dat, f):
-        import numpy as np
-        _dat = np.transpose(dat, [1, 2, 0])
-        
-        from PIL import Image
-        Image.fromarray(_dat, 'RGBA').save(f)
-
     def _load_color(self, f):
         import re
         from gio import file_mag
@@ -508,7 +501,35 @@ class band:
         else:
             return [self.bnd[_b].read_block(bnd) for _b in range(len(self.bnd))]
             
-    def _img_to_png(self, bnds, f):
+    def _burn(self, bnd, opts):
+        _bnd = bnd
+        
+        if 'burn_band' in opts:
+            _opts = opts.get('burn_band', {})
+            _clrs = _opts.get('color')
+            _finp = _opts.get('input')
+            _offs = _opts.get('offset', 200)
+            
+            logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
+            
+            from gio import band_op
+            _bnd = band_op.burn_band(_bnd, None, _finp, _clrs, _offs)
+            
+        if 'burn_transparency' in opts:
+            _opts = opts.get('burn_transparency', {})
+            _clrs = _opts.get('color', None)
+            _finp = _opts.get('input')
+            _vmin = float(_opts.get('value_min'))
+            _vmax = float(_opts.get('value_max'))
+            
+            logging.debug('burn transparency %s, %s, %s' % (_finp, _vmin, _vmax))
+            
+            from gio import band_op
+            _bnd = band_op.burn_transparency(_bnd, None, _finp, _vmin, _vmax)
+        
+        return _bnd
+            
+    def _img_to_png(self, bnds, f, opts):
         import numpy as np
         
         _msk = bnds[0]
@@ -520,18 +541,21 @@ class band:
             _dat[_b, :, :] = bnds[_b].data
             
         if self.mask is not None:
-            _msk = self.mask.read_block(msk)
-            if _msk:
-                _dat[3, :, :][_msk.data != 1] = 0
-
+            _mmm = self.mask.read_block(_msk)
+            if _mmm:
+                _dat[3, :, :][_mmm.data != 1] = 0
+                
+        _bnd = _msk.from_grid(_dat)
+        _bnd = self._burn(_bnd, opts)
+        
         if self.region is not None:
             from gio import file_unzip as fzip
             with fzip.zip() as _zip:
-                _mask_grid(_msk.from_grid(_dat), self.region, _zip)
-            
-        self._save_rgb(_dat, f)
+                _mask_grid(_bnd, self.region, _zip)
+                
+        self._save_rgb(_bnd, f)
 
-    def _save_band(self, bnd, cs, f_out):
+    def _save_band(self, bnd, cs, f_out, opts):
         if cs == None or list(cs.keys()) == 0:
             raise Exception('failed to find color table')
 
@@ -539,7 +563,7 @@ class band:
             return
         
         if len(bnd) > 1:
-            return self._img_to_png(bnd, f_out)
+            return self._img_to_png(bnd, f_out, opts)
             
         if bnd[0] == None:
             return
@@ -554,7 +578,7 @@ class band:
             with fzip.zip() as _zip:
                 _mask_grid(bnd[0], self.region, _zip)
 
-        self._save(bnd[0], cs, f_out)
+        self._save(bnd[0], cs, f_out, opts)
             
     def make(self, bnd, f_clr, f_out, agg=None, opts={}):
         _bnd = self._load_band(bnd, agg=agg, opts=opts)
@@ -562,13 +586,7 @@ class band:
             return
 
         _cs = self._load_color_table(f_clr)
-
-        # import json
-        # json.dump(_cs, open('test_color.txt', 'w'))
-        # _bnd[0].save(f_out[:-4] + '.tif')
-        # self._save_band(_bnd, _cs, 'test_preview.png')
-
-        self._save_band(_bnd, _cs, f_out)
+        self._save_band(_bnd, _cs, f_out, opts)
 
     def make_perc(self, bnd, val, vals, f_clr, f_out, agg=None, mag=1, opts={}):
         _bnd = self._load_band(bnd, val, vals, agg=agg, opts=opts)
@@ -588,4 +606,4 @@ class band:
 
         # self._save_band(_bnd, _cs, 'test_preview.png')
 
-        self._save_band(_bnd, _cs, f_out)
+        self._save_band(_bnd, _cs, f_out, opts)

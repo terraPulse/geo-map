@@ -53,7 +53,7 @@ class map_tile:
         from gio import run_commands
         _rs = run_commands.run(_c)
 
-        logging.info('create tile: %s (%s)' % (_c, _rs[0]))
+        logging.debug('create tile: %s (%s)' % (_c, _rs[0]))
 
         return _rs[0] == 0
 
@@ -199,7 +199,7 @@ class map_tile:
         _q, _v = path.split('/', 1) if '/' in path else ('', path)
         _d_web = config.get_at('general', 'map_path')
 
-        logging.info('map path: %s' % _d_web)
+        logging.debug('map path: %s' % _d_web)
 
         _loc = self._normalize_path(path)
 
@@ -209,7 +209,7 @@ class map_tile:
         else:
             _out = os.path.join(_d_web, _met.tag, '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
 
-        logging.info('request tile %s' % _out)
+        logging.debug('request tile %s' % _out)
 
         if not _out.endswith('.png'):
             raise Exception('failed to find %s' % _loc)
@@ -227,7 +227,7 @@ class map_tile:
                 logging.debug('generating map tile (%s)' % _out)
                 self._dmap_mag_single(_loc, _met)
 
-                logging.info('get tile %s' % _out)
+                logging.debug('get tile %s' % _out)
                 if not file_mag.get(_out).exists():
                     _out = config.get('general', 'nodata_file')
 
