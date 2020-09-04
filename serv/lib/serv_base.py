@@ -77,7 +77,7 @@ class service_base:
 
         _resp.headers['Content-Type'] = _context
         _type = 'inline' if (not attachment) else 'attachment'
-        _resp.headers['Content-Disposition'] = '%s; filename=%s' % (_type, os.path.basename(f))
+        _resp.headers['Content-Disposition'] = '%s; filename=%s' % (_type, f)
 
         return _resp
 

@@ -57,29 +57,20 @@ class map_tile:
 
         return _rs[0] == 0
 
-    def _dmap_mag_single(self, f, met):
+    def _dmap_mag_single(self, met):
         try:
-            return self._dmap_single(f, met)
+            return self._dmap_single(met)
         finally:
             pass
-
-    def _load_setting(self, f_inp):
-        import re
+        
+    def _load_setting(self, tag, lev, col, row):
         import os
-
-        _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f_inp)
-
-        _tag = _m.group(1)
-        _lev = int(_m.group(2))
-        _col = int(_m.group(3))
-        _row = int(_m.group(4))
-
         from gio import obj
         from gio import config
         from gio import file_mag
         from gio import obj
 
-        _out = os.path.join(config.get('general', 'map_path'), _tag)
+        _out = os.path.join(config.get('general', 'map_path'), tag)
         _f_ini = file_mag.get(os.path.join(_out, 'setting.ini')).get()
 
         if _f_ini:
@@ -87,14 +78,14 @@ class map_tile:
         else:
             _met = obj.obj()
 
-        _met.lev = _lev
-        _met.row = _row
-        _met.col = _col
-        _met.tag = _tag
+        _met.lev = lev
+        _met.row = row
+        _met.col = col
+        _met.tag = tag
 
         return _met
 
-    def _dmap_single(self, f_inp, met):
+    def _dmap_single(self, met):
         from gio import config
         import os
 
@@ -142,14 +133,6 @@ class map_tile:
         from geo_map_util import map_tile
         map_tile.make_tile(_inp, _lev, _col, _row, _pec, _valid_vals, _solid_bg, _clr, _mask, _out, agg=_agg, opts=met)
 
-        logging.debug('generated tile %s' % f_inp)
-
-    def _format_path(self, p):
-        if p.startswith('/a/'):
-            return '/'.join([''] + p.split('/')[3:])
-
-        return p
-
     def _split_vars(self, c):
         _vs = c.split('&')
         _ps = {}
@@ -162,60 +145,67 @@ class map_tile:
                 _ps[_v] = None
 
         return _ps
+        
+    def _burn(self, f, met):
+        import numpy as np
+        import io
+        from PIL import Image
+        
+        _load_img = lambda x: np.array(Image.open(x))
+        
+        _img = _load_img(f)
+        if 'burn_band' in met:
+            _opts = met.get('burn_band', {})
+            _mlev = _opts.getint('level', 1)
+            if met.lev >= _mlev:
+                _ftag = _opts.get('input')
+                _finp = map_tile().get(_ftag, met.lev, met.col, met.row)
+                if _finp:
+                    _offs = _opts.get('offset', 200)
+                    logging.debug('burn band %s, %s' % (_ftag, _offs))
+                    _burn_band(_img, _load_img(io.BytesIO(_finp)), _offs)
+            
+        if 'burn_transparency' in met:
+            _opts = met.get('burn_transparency', {})
+            _mlev = _opts.getint('level', 1)
+            if met.lev >= _mlev:
+                _ftag = _opts.get('input')
+                _finp = map_tile().get(_ftag, met.lev, met.col, met.row)
+                if _finp:
+                    logging.debug('burn transparency %s' % (_ftag))
+                    _burn_transparency(_img, _load_img(io.BytesIO(_finp)))
+        
+        return Image.fromarray(_img)
 
-    def _normalize_path(self, p):
-        import re
-        _m = re.search('^(.+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)$', p)
-        if not _m:
-            return None
-
-        _tag = _m.group(1)
-        _lev = int(_m.group(2))
-        _col = _m.group(3)
-        _row = _m.group(4)
-
-        _num = 2 ** _lev
-
-        if _col[0] in ('_', '-'):
-            _col = _num - int(_col[1:]) - 1
-        else:
-            _col = int(_col)
-
-        if _row[0] in ('_', '-'):
-            _row = _num - int(_row[1:]) - 1
-        else:
-            _row = int(_row)
-
-        return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
-
-    def get(self, path):
+    def _post_proc(self, f, met):
+        if 'burn_band' in met or 'burn_transparency' in met:
+            import io
+        
+            _img = self._burn(f, met)
+            _buf = io.BytesIO()
+            
+            _img.save(_buf, format='PNG')
+            return _buf.getvalue()
+            
+        with open(f, 'rb') as _fi:
+            return _fi.read()
+            
+    def get(self, tag, lev, col, row):
         import os
-        from gio import config
+        from gio import file_unzip
         from gio import file_mag
-
-        if not path:
-            path = '/'
-
-        _q, _v = path.split('/', 1) if '/' in path else ('', path)
+        from gio import config
+        
+        _met = self._load_setting(tag, lev, col, row)
+        
         _d_web = config.get_at('general', 'map_path')
-
         logging.debug('map path: %s' % _d_web)
-
-        _loc = self._normalize_path(path)
-
-        _met = self._load_setting(_loc)
+    
         if _met.get('version', 1.0) >= 2.0:
             _out = os.path.join(_d_web, _met.tag, 'tiles', '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
         else:
             _out = os.path.join(_d_web, _met.tag, '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
-
         logging.debug('request tile %s' % _out)
-
-        if not _out.endswith('.png'):
-            raise Exception('failed to find %s' % _loc)
-
-        from gio import file_unzip
-        from gio import config
 
         with file_unzip.zip() as _zip:
             _cache = config.get('conf', 'cache', None)
@@ -225,13 +215,87 @@ class map_tile:
 
             if not file_mag.get(_out).exists():
                 logging.debug('generating map tile (%s)' % _out)
-                self._dmap_mag_single(_loc, _met)
+                self._dmap_mag_single(_met)
 
                 logging.debug('get tile %s' % _out)
                 if not file_mag.get(_out).exists():
                     _out = config.get('general', 'nodata_file')
 
-            return _out
+            return self._post_proc(_out, _met)
 
-        raise Exception('no module found %s' % _q)
+        raise Exception('no module found %s' % tag)
 
+def _burn_band(b1, b2, offset=200):
+    import numpy as np
+
+    for _b in range(3):
+        _o = b1[:, :, _b].astype(np.int16)
+        _x = b2[:, :, _b]
+        
+        _o += _x
+        _o -= offset
+        
+        _o[_o < 0] = 0
+        _o[_o > 255] = 255
+        
+        b1[:, :, _b] = _o.astype(np.uint8)
+        
+    _a = b1[:, :, 3]
+    _a[b2[:, :, 3] == 0] = 0
+    b1[:, :, 3] = _a
+
+    return b1
+
+def _burn_transparency(b1, b2):
+    import numpy as np
+    b1[:, :, 3] = np.minimum(np.minimum(b1[:, :, 3], b2[:, :, 0]), b2[:, :, 3])
+    return b1
+
+def _parse_url(f):
+    import re
+
+    _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f)
+
+    _tag = _m.group(1)
+    _lev = int(_m.group(2))
+    _col = int(_m.group(3))
+    _row = int(_m.group(4))
+    
+    return {'tag': _tag, 'lev': _lev, 'col': _col, 'row': _row}
+
+def _normalize_path(p):
+    import re
+    _m = re.search('^(.+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)$', p)
+    if not _m:
+        return None
+
+    _tag = _m.group(1)
+    _lev = int(_m.group(2))
+    _col = _m.group(3)
+    _row = _m.group(4)
+
+    _num = 2 ** _lev
+
+    if _col[0] in ('_', '-'):
+        _col = _num - int(_col[1:]) - 1
+    else:
+        _col = int(_col)
+
+    if _row[0] in ('_', '-'):
+        _row = _num - int(_row[1:]) - 1
+    else:
+        _row = int(_row)
+
+    return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
+        
+def get(path):
+    import os
+
+    _path = path
+    if not _path:
+        _path = '/'
+    _path = _normalize_path(path)
+    
+    _out = map_tile().get(**_parse_url(_path))
+    logging.debug('output %s, %s' % (_path, len(_out)))
+    return _out

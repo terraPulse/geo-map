@@ -308,15 +308,13 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         
     if opts.burn_band_input:
         _obj.burn_band.input = opts.burn_band_input
-        if opts.burn_band_color:
-            _obj.burn_band.color = opts.burn_band_color
         if opts.burn_band_offset is not None:
             _obj.burn_band.offset = opts.burn_band_offset
+        _obj.burn_band.level = opts.burn_band_level
             
     if opts.burn_transparency_input:
         _obj.burn_transparency.input = opts.burn_transparency_input
-        _obj.burn_transparency.value_min = opts.burn_transparency_value_min
-        _obj.burn_transparency.value_max = opts.burn_transparency_value_max
+        _obj.burn_transparency.level = opts.burn_transparency_level
 
     _obj.save(os.path.join(d_out, 'setting.ini'))
 
@@ -383,13 +381,10 @@ def usage():
     _p.add_argument('--version', dest='version', type=float, default=2.0)
     
     _p.add_argument('--burn-band-input', dest='burn_band_input')
-    _p.add_argument('--burn-band-color', dest='burn_band_color')
     _p.add_argument('--burn-band-offset', dest='burn_band_offset', type=int, default=250)
     _p.add_argument('--burn-band-level', dest='burn_band_level', type=int, default=1)
     
     _p.add_argument('--burn-transparency-input', dest='burn_transparency_input')
-    _p.add_argument('--burn-transparency-value-min', dest='burn_transparency_value_min', type=float, default=0)
-    _p.add_argument('--burn-transparency-value-max', dest='burn_transparency_value_max', type=float, default=100)
     _p.add_argument('--burn-transparency-level', dest='burn_transparency_level', type=int, default=1)
 
     _p.add_argument('-e', '--execute', dest='execute', action='store_true', \

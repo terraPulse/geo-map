@@ -1,4 +1,10 @@
 
+def change_prob(v):
+    if v is None:
+        return None
+        
+    return round(v, 1)
+    
 def ndvi(v):
     if v is None:
         return None
@@ -72,6 +78,9 @@ def map_value(tag, v):
     if not tag:
         return v
         
+    if tag == 'change_prob':
+        return change_prob(v)
+        
     if tag == 'forest_loss':
         return forest_loss(v)
         
@@ -98,22 +107,25 @@ def parse_tag(t, tag, f):
         
     _t = t.lower().strip()
     
-    if 'forest_loss' in t:
+    if 'forest_' in _t and '_prob' in _t:
+        return 'change_prob'
+        
+    if 'forest_loss' in _t:
         return 'forest_loss'
         
-    if 'forest_gain' in t:
+    if 'forest_gain' in _t:
         return 'forest_gain'
         
-    if 'forest_esta' in t:
+    if 'forest_esta' in _t:
         return 'forest_esta'
         
-    if 'tcc' in t:
+    if 'tcc' in _t:
         return 'tcc'
         
-    if 'cdl' in t:
+    if 'cdl' in _t:
         return 'cdl'
         
-    if 'ndvi' in t or 'ndsi' in t or 'ndwi' in t:
+    if 'ndvi' in _t or 'ndsi' in _t or 'ndwi' in _t:
         return 'ndvi'
         
     return None

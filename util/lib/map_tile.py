@@ -504,6 +504,7 @@ class band:
             
     def _burn(self, bnd, opts):
         _bnd = bnd
+        return bnd
         
         if 'burn_band' in opts:
             _opts = opts.get('burn_band', {})

@@ -99,7 +99,15 @@ class map_obj(serv_base.service_base):
 
     def task(self, path):
         from geo_map_util import map_tile_parse
-        return self.output_file(map_tile_parse.map_tile().get(path))
+        return self.output_byte(path, map_tile_parse.get(path))
+        
+        # from gio import file_unzip
+        # with file_unzip.zip() as _zip:
+        #     _f_out = _zip.generate_file('', '.png')
+        #     with open(_f_out, 'wb') as _fo:
+        #         _fo.write(map_tile_parse.get(path))
+                
+        #     return self.output_file(_f_out)
 
         # _zips = load_zips()
         # if _p not in _zips.keys():
