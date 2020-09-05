@@ -33,7 +33,10 @@ def main(opts):
     if not (_ip and _ip.strip()):
         _ip = get_ip_address()
 
-    logging.info('ip address: ' + _ip)
+    _port = config.getint('conf', 'port', 8090)
+    
+    print('ip address: %s (%s)' % (_ip, _port))
+    logging.info('ip address: %s (%s)' % (_ip, _port))
 
     _ssl_key = config.get('conf', 'ssl_key')
     _ssl_crt = config.get('conf', 'ssl_crt')
@@ -44,7 +47,6 @@ def main(opts):
         logging.info('use SSL key %s, %s' % (_ssl_key, _ssl_crt))
         _con = '--certfile %s --keyfile %s ' % (_ssl_crt, _ssl_key)
 
-    _port = config.getint('conf', 'port', 8090)
     _pnum = config.getint('conf', 'process', 10)
 
     _time_out = config.getint('conf', 'timeout', 60)

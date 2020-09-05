@@ -101,28 +101,23 @@ def main(opts):
 
     from gio import config
     _ip = config.get('conf', 'host')
+    _port = config.getint('conf', 'port', 8090)
+    
     if not (_ip and _ip.strip()):
         _ip = get_ip_address()
 
-    logging.info('ip address: ' + _ip)
+    print('ip address: %s (%s)' % (_ip, _port))
+    logging.info('ip address: %s (%s)' % (_ip, _port))
 
     _ssl_key = config.get('conf', 'ssl_key')
     _ssl_crt = config.get('conf', 'ssl_crt')
 
     _context = None
     if _ssl_key or _ssl_crt:
-        # from OpenSSL import SSL
-        # _context = SSL.Context(SSL.SSLv23_METHOD)
-        # if _ssl_key:
-        #     logging.info('use SSL key' % _ssl_key)
-        #     _context.use_privatekey_file(_ssl_key)
-        # if _ssl_crt:
-        #     logging.info('use SSL crt' % _ssl_crt)
-        #     _context.use_certificate_file(_ssl_crt)
         logging.info('use SSL key %s, %s' % (_ssl_key, _ssl_crt))
         _context = (_ssl_crt, _ssl_key)
 
-    _app.run(host=_ip, port=config.getint('conf', 'port', 8090), \
+    _app.run(host=_ip, port=_port, \
             threaded=config.getboolean('conf', 'threaded', False), \
             ssl_context=_context, \
             processes=config.getint('conf', 'process', 3))
