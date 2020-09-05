@@ -71,7 +71,7 @@ def init():
     from gio import config
     from gio import logging_util
 
-    config.load('map_server2_wsgi')
+    config.load('map_server2')
 
     import os
     _f_log = os.environ['G_LOG_S']

@@ -27,6 +27,8 @@ def main(opts):
     from gio import config
     from gio import logging_util
 
+    config.load('map_server2')
+    
     _ip = config.get('conf', 'host')
     if not (_ip and _ip.strip()):
         _ip = get_ip_address()
