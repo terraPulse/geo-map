@@ -270,7 +270,12 @@ class band:
         from gio import file_mag
 
         _cs = {}
-        with open(file_mag.get(f).get()) as _fi:
+        _ff = file_mag.get(f)
+        
+        if not _ff.exists():
+            return _cs
+            
+        with open(_ff.get()) as _fi:
             for _l in _fi.read().splitlines():
                 _vs = re.split('\s+', _l.strip())
                 if len(_vs) < 2:
