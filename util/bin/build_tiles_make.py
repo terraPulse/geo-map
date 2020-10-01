@@ -22,7 +22,7 @@ def load_shp(f):
     from gio import file_mag
     from gio import geo_base as gb
 
-    _shp = ogr.Open(f)
+    _shp = ogr.Open(file_mag.get(f).get())
     if _shp is None:
         raise Exception('Failed to load shapefile ' + f)
 
