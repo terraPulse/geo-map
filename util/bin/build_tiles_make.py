@@ -352,7 +352,7 @@ def main(opts):
     if opts.update_list:
         print('update map list')
         
-        _cmd = 'update_map_list.py -o %s' % _d_out
+        _cmd = 'update_map_list.py -o %s' % config.get('conf', 'output')
         run_commands.run(_cmd)
 
     if opts.execute:
@@ -397,8 +397,11 @@ def usage():
     _p.add_argument('--burn-transparency-input', dest='burn_transparency_input')
     _p.add_argument('--burn-transparency-level', dest='burn_transparency_level', type=int, default=1)
 
-    _p.add_argument('-e', '--execute', dest='execute', action='store_true', \
-        help='run build_tiles_task.py after the map task is generated')
+    _p.add_argument('-e', '--execute', dest='execute', type='bool', \
+        help='run build_tiles_task.py after the map task is defined')
+        
+    _p.add_argument('-u', '--update-list', dest='update_list', type='bool', default=True, \
+        help='run update_map_list.py after the map task is defined')
 
     return _p
 
