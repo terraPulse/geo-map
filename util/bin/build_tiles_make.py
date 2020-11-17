@@ -31,7 +31,11 @@ def load_shp(f):
     _area = None
 
     for _f in _lyr:
-        _obj = gb.geo_polygon(_f.geometry().Clone())
+        _geo = _f.geometry()
+        if _geo is None:
+            continue
+        
+        _obj = gb.geo_polygon(_geo.Clone())
         _ext = _obj.extent()
 
         _objs.append(_obj)
@@ -218,7 +222,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
         for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
             _ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
-                    os.path.join(d_ooo, os.path.basename(_f_clr)), opts.mask, d_ooo))
+                    os.path.basename(_f_clr), opts.mask, ''))
 
     logging.info('found %s task' % len(_ps))
     print('found %s tasks' % len(_ps))
@@ -323,6 +327,7 @@ def main(opts):
     gdal.UseExceptions()
 
     from gio import config
+    from gio import run_commands
     import os
     
     _d_out = os.path.join(config.get('conf', 'output'), opts.tag)
@@ -343,6 +348,12 @@ def main(opts):
                 _d_out, _zip, opts)
                 
         file_unzip.compress_folder(_d_tmp, _d_out, [])
+        
+    if opts.update_list:
+        print('update map list')
+        
+        _cmd = 'update_map_list.py -o %s' % _d_out
+        run_commands.run(_cmd)
 
     if opts.execute:
         print('generate map tiles')
@@ -353,7 +364,6 @@ def main(opts):
                 opts.instance_num, opts.instance_pos, opts.task_num, \
                         '-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
 
-        from gio import run_commands
         # run_commands.run(_cmd + _agg + _tsk)
         run_commands.run(_cmd + _tsk)
 

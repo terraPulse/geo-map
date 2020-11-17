@@ -9,7 +9,7 @@ Create: 2015-09-10 16:02:12
 Description:
 '''
 
-def _make_tile(f, lev, num, col, row, pec, vals, solid_bg, clr, msk, out, params, opts):
+def _make_tile(f, lev, num, col, row, pec, vals, solid_bg, clr, msk, out, params, opts, d_out):
     if opts.level_min is not None:
         if lev < opts.level_min:
             return
@@ -17,6 +17,11 @@ def _make_tile(f, lev, num, col, row, pec, vals, solid_bg, clr, msk, out, params
     if opts.level_max is not None:
         if lev > opts.level_max:
             return
+        
+    if d_out:
+        import os
+        out = d_out
+        clr = os.path.join(d_out, os.path.basename(clr))
 
     # if not (lev == 7 and col == 11 and row == 97):
     #     return
@@ -54,7 +59,7 @@ def main(opts):
         from gio import obj
         _met = obj.load(file_mag.get(_f_ini).get())
 
-    multi_task.run(_make_tile, _tt, opts, (_met, opts, ))
+    multi_task.run(_make_tile, _tt, opts, (_met, opts, _out))
     print()
 
 def usage():
