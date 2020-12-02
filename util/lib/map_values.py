@@ -44,6 +44,18 @@ def forest_esta(v):
     
     return 1970 + v
     
+def forest_age(v):
+    if v is None:
+        return None
+        
+    if v >= 100:
+        return None
+        
+    if v == 50:
+        return '>=50' 
+        
+    return v
+    
 def tcc(v):
     if v <= 100:
         return v
@@ -90,6 +102,9 @@ def map_value(tag, v):
     if tag == 'forest_esta':
         return forest_esta(v)
         
+    if tag == 'forest_age':
+        return forest_age(v)
+        
     if tag == 'tcc':
         return tcc(v)
         
@@ -118,6 +133,9 @@ def parse_tag(t, tag, f):
         
     if 'forest_esta' in _t:
         return 'forest_esta'
+        
+    if 'forest_age' in _t:
+        return 'forest_age'
         
     if 'tcc' in _t:
         return 'tcc'
