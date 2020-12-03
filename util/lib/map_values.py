@@ -56,6 +56,23 @@ def forest_age(v):
         
     return v
     
+def naip_lc(v):
+    if v == 1:
+        return 'shadow'
+    if v == 2:
+        return 'water'
+    if v == 3:
+        return 'bare'
+    if v == 4:
+        return 'herbaceous'
+    if v == 5:
+        return 'tree'
+    if v == 6:
+        return 'paved'
+    if v == 7:
+        return 'building'
+    return None
+    
 def tcc(v):
     if v <= 100:
         return v
@@ -114,6 +131,9 @@ def map_value(tag, v):
     if tag == 'ndvi':
         return ndvi(v)
         
+    if tag == 'naip/lc':
+        return naip_lc(v)
+        
     return v
     
 def parse_tag(t, tag, f):
@@ -136,6 +156,9 @@ def parse_tag(t, tag, f):
         
     if 'forest_age' in _t:
         return 'forest_age'
+        
+    if 'naip/lc' in _t:
+        return 'naip/lc'
         
     if 'tcc' in _t:
         return 'tcc'
