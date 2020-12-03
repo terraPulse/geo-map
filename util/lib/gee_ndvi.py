@@ -66,18 +66,21 @@ def add_landsat_records(pt, ls, images, ndvi_func, date_s, date_e):
     _list = _list_image.select("NDVI").getRegion(pt, 50)
 
     _n = 0
-    for _l in _list.getInfo()[1:]:
-        _d = datetime.datetime.fromtimestamp(_l[3] / 1e3)
-        _v = _l[4]
-
-        if _v is None or _v < -1.0 or _v > 1.0:
-            continue
-        
-        ls[_d] = _v
-        _n += 1
-
-    logging.info('add %s %s images' % (_n, images))
-
+    try:
+        for _l in _list.getInfo()[1:]:
+            _d = datetime.datetime.fromtimestamp(_l[3] / 1e3)
+            _v = _l[4]
+    
+            if _v is None or _v < -1.0 or _v > 1.0:
+                continue
+            
+            ls[_d] = _v
+            _n += 1
+    
+        logging.info('add %s %s images' % (_n, images))
+    except:
+        logging.info('failed to search images')
+    
 def _valid_ndvi(v):
     # if v < 0.02:
     #     return False
