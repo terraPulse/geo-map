@@ -166,7 +166,7 @@ def parse_tag(t, tag, f):
     if 'cdl' in _t:
         return 'cdl'
         
-    if 'ndvi' in _t or 'ndsi' in _t or 'ndwi' in _t:
+    if 'idx' not in _t and ('ndvi' in _t or 'ndsi' in _t or 'ndwi' in _t):
         return 'ndvi'
         
     return None
