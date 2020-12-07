@@ -140,7 +140,11 @@ def _extract_reg(tag, mak, cat=False):
     import numpy.ma
     from . import map_values
     
-    _f = _load_setting(tag)
+    _met = _load_setting(tag)
+    if _met is None:
+        return None
+    
+    _f = _met.get('file')
     if not _f:
         logging.warning('failed to find the data layer (%s)' % tag)
         return None
@@ -150,7 +154,18 @@ def _extract_reg(tag, mak, cat=False):
         logging.warning('failed to create mask')
         return None
         
-    _da = numpy.ma.array(_bd.data, mask=(mak.data != 1) | (_bd.data == _bd.nodata))
+    _msk = (mak.data != 1) | (_bd.data == _bd.nodata)
+    
+    # use min and max values
+    _min_val = _met.get('min_value')
+    if _min_val is not None:
+        _msk = _msk | _bd.data < _min_val
+    
+    _max_val = _met.get('max_value')
+    if _max_val is not None:
+        _msk = _msk | _bd.data > _max_val
+    
+    _da = numpy.ma.array(_bd.data, mask=_msk)
     
     if cat:
         _rs = _categories(_da)
@@ -169,11 +184,28 @@ def _extract_pt(tag, lon, lat):
     from gio import config
     import logging
 
-    _f = _load_setting(tag)
+    _met = _load_setting(tag)
+    if _met is None:
+        return None
+    
+    _f = _met.get('file')
     if not _f:
         return None
 
     _v = _read(_f, lon, lat)
+    if _v is None:
+        return None
+    
+    # use min and max values
+    _min_val = _met.get('min_value')
+    if _min_val is not None:
+        if _v < _min_val:
+            return None
+    
+    _max_val = _met.get('max_value')
+    if _max_val is not None:
+        if _v > _max_val:
+            return None
     
     from . import map_values
     return map_values.text(tag, None, _f, _v)
@@ -192,10 +224,7 @@ def _load_setting(tag):
     from gio import obj
     _met = obj.load(file_mag.get(_f_ini).get())
     
-    if not _met:
-        return None
-
-    return _met.get('file')
+    return _met
     
 def loc(tag, lon, lat):
     if not tag:
