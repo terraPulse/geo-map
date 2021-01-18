@@ -118,6 +118,7 @@ def _categories(g):
         
     _ss = {}
     for _v in _vs:
+        _v = round(_v, 1)
         if _v not in _ss:
             _ss[_v] = 0
             
