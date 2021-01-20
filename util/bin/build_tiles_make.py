@@ -325,6 +325,11 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
 def main(opts):
     from osgeo import gdal
     gdal.UseExceptions()
+    
+    if opts.hillshade:
+        opts.burn_band_input = 'dem/aw3d30/hillshade-lit'
+        opts.burn_band_offset = 200
+        opts.burn_band_level = 5
 
     from gio import config
     from gio import run_commands
@@ -389,6 +394,8 @@ def usage():
     _p.add_argument('--min-value', dest='min_value', type=float)
     _p.add_argument('--max-value', dest='max_value', type=float)
     _p.add_argument('--version', dest='version', type=float, default=2.0)
+    
+    _p.add_argument('--hillshade', dest='hillshade', type='bool')
     
     _p.add_argument('--burn-band-input', dest='burn_band_input')
     _p.add_argument('--burn-band-offset', dest='burn_band_offset', type=int, default=250)
