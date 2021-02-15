@@ -321,7 +321,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         _obj.burn_transparency.level = opts.burn_transparency_level
 
     _obj.save(os.path.join(d_out, 'setting.ini'))
-
+    
 def main(opts):
     from osgeo import gdal
     gdal.UseExceptions()
@@ -352,6 +352,16 @@ def main(opts):
                 opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_tmp, \
                 _d_out, _zip, opts)
                 
+        if opts.clean_tiles:
+            if opts.version < 2.0:
+                logging.warning('skip cleaning tiles for old versions (<2.0)')
+            else:
+                logging.info('cleaning tiles')
+                print('cleaning tiles')
+                
+                from gio import file_mag
+                file_mag.get(os.path.join(_d_out, 'tiles')).remove()
+
         file_unzip.compress_folder(_d_tmp, _d_out, [])
         
     if opts.update_list:
@@ -394,6 +404,8 @@ def usage():
     _p.add_argument('--min-value', dest='min_value', type=float)
     _p.add_argument('--max-value', dest='max_value', type=float)
     _p.add_argument('--version', dest='version', type=float, default=2.0)
+    _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', default=True, \
+            help='remove the tiles previously generated for the layer')
     
     _p.add_argument('--hillshade', dest='hillshade', type='bool')
     
