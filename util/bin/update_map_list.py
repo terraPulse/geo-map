@@ -17,8 +17,8 @@ def _list_maps(d, ds):
         if not os.path.isdir(os.path.join(d, _d)):
             continue
 
-        if re.match('^\d+$', _d):
-            continue
+        # if re.match('^\d+$', _d):
+        #     continue
 
         if _d.startswith('.') or _d.startswith('_'):
             continue
@@ -28,7 +28,20 @@ def _list_maps(d, ds):
             ds.append(os.path.join(d, _d))
             continue
 
+        _f = os.path.join(d, _d, 'tiles')
+        if os.path.exists(_f) and os.path.isdir(_f):
+            continue
+        
         _list_maps(os.path.join(d, _d), ds)
+        
+def _format_dir(d, root):
+    import os
+    
+    _root = root
+    if not _root.endswith(os.path.sep):
+        _root = _root + os.path.sep
+    
+    return d[len(_root): ]
             
 def main(opts):
     from gio import config
@@ -41,7 +54,9 @@ def main(opts):
         _d_out = os.path.abspath(_d_out)
 
     _ms = []
+    
     _list_maps(_d_out, _ms)
+    _ms = [_format_dir(_m, _d_out) for _m in _ms]
     
     _f_out = os.path.join(_d_out, 'list.txt')
     
