@@ -9,11 +9,14 @@ Description:
 def _list_maps(d, ds):
     import os
     import re
+    import logging
     
     if not os.path.exists(d):
         return
 
     for _d in os.listdir(d):
+        logging.info('checking %s' % os.path.join(d, _d))
+        
         if not os.path.isdir(os.path.join(d, _d)):
             continue
 
@@ -30,6 +33,10 @@ def _list_maps(d, ds):
 
         _f = os.path.join(d, _d, 'tiles')
         if os.path.exists(_f) and os.path.isdir(_f):
+            continue
+        
+        _f = os.path.join(d, _d, 'tasks.txt')
+        if os.path.exists(_f):
             continue
         
         _list_maps(os.path.join(d, _d), ds)
