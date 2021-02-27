@@ -329,7 +329,7 @@ def main(opts):
     if opts.hillshade:
         opts.burn_band_input = 'dem/aw3d30/hillshade-lit'
         opts.burn_band_offset = 200
-        opts.burn_band_level = 5
+        opts.burn_band_level = 1
 
     from gio import config
     from gio import run_commands
