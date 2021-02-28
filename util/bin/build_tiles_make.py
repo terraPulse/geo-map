@@ -296,6 +296,10 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         print('max_value: ', opts.max_value)
         _obj.max_value = opts.max_value
         
+    if opts.fill_nodata is not None:
+        print('fill nodata:', opts.fill_nodata)
+        _obj.fill_nodata = opts.fill_nodata
+        
     _min_dynamic_level = levels[1]
     if _min_dynamic_level is not None:
         print('min_dynamic_level: ', _min_dynamic_level)
@@ -394,6 +398,7 @@ def usage():
     _p.add_argument('--title', dest='title')
     _p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
     _p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
+    _p.add_argument('--fill-nodata', dest='fill_nodata', type=float)
     _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
     _p.add_argument('-m', '--mask', dest='mask')
     _p.add_argument('-r', '--region', dest='region')

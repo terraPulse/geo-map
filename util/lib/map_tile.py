@@ -487,6 +487,10 @@ class band:
             if _val is not None and _bnd.nodata is not None:
                 _bnd.data[_bnd.data > _val] = _bnd.nodata
                 
+            _val = opts.get('fill_nodata', None)
+            if _val is not None and _bnd.nodata is not None:
+                _bnd.data[_bnd.data == _bnd.nodata] = _val
+                
             _mmu = opts.get('mmu', 0)
             if _mmu > 0:
                 from gio import mod_filter
