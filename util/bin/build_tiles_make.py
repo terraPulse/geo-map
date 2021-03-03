@@ -409,7 +409,7 @@ def usage():
     _p.add_argument('--min-value', dest='min_value', type=float)
     _p.add_argument('--max-value', dest='max_value', type=float)
     _p.add_argument('--version', dest='version', type=float, default=2.0)
-    _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', default=True, \
+    _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
             help='remove the tiles previously generated for the layer')
     
     _p.add_argument('--hillshade', dest='hillshade', type='bool')
