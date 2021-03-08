@@ -5,7 +5,7 @@ class values_mapping:
     
     def __init__(self, vs):
         self._vs = vs
-        self._null = self._vs.get('nodata', self._vs.get('null', 'null'))
+        self._null = self._vs.get('nodata', self._vs.get('null', None))
         
     def get(self, v):
         return self._vs.get(v, self._null)
