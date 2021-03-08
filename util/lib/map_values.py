@@ -1,4 +1,15 @@
 
+import logging
+        
+class values_mapping:
+    
+    def __init__(self, vs):
+        self._vs = vs
+        self._null = self._vs.get('nodata', self._vs.get('null', 'null'))
+        
+    def get(self, v):
+        return self._vs.get(v, self._null)
+
 def change_prob(v):
     if v is None:
         return None
@@ -104,6 +115,9 @@ def cdl(v):
     return _s.iloc[0]
 
 def map_value(tag, v):
+    if isinstance(tag, values_mapping):
+        return tag.get(v)
+        
     if not tag:
         return v
         
@@ -136,7 +150,15 @@ def map_value(tag, v):
         
     return v
     
-def parse_tag(t, tag, f):
+def parse_tag(t, tag, met):
+    if met.get('values_mapping'):
+        from gio import file_mag
+        import yaml
+        
+        logging.info('values_mapping: %s' % met.get('values_mapping'))
+        with open(file_mag.get(met.get('values_mapping')).get()) as _fi:
+            return values_mapping(yaml.safe_load(_fi))
+    
     if tag:
         return tag.lower().strip()
         
@@ -171,19 +193,19 @@ def parse_tag(t, tag, f):
         
     return None
     
-def text(t, tag, f, v):
-    _v = map_value(parse_tag(t, tag, f), v)
+def text(t, tag, met, v):
+    _v = map_value(parse_tag(t, tag, met), v)
     
     if _v is None:
         return '-'
         
     return _v
 
-def categories(t, tag, f, cs):
+def categories(t, tag, met, cs):
     if cs is None:
         return None
         
-    _tag = parse_tag(t, tag, f)
+    _tag = parse_tag(t, tag, met)
     
     if _tag == 'tcc':
         _cs = {}
@@ -192,6 +214,3 @@ def categories(t, tag, f, cs):
         return _cs
     
     return cs
-            
-        
-    
