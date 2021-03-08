@@ -12,10 +12,11 @@ Description: make tiling tasks
 import logging
 
 def format_path(p):
-    if p.startswith('/a/'):
-        return '/'.join([''] + p.split('/')[3:])
-
-    return p
+    if p.startswith('s3://') or p.startswith('PG:')):
+        return p
+        
+    import os
+    return os.path.abspath(p)
 
 def load_shp(f):
     from osgeo import ogr
@@ -300,6 +301,10 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         print('fill nodata:', opts.fill_nodata)
         _obj.fill_nodata = opts.fill_nodata
         
+    if opts.values_mapping is not None:
+        print('values_mapping:', format_path(opts.values_mapping))
+        _obj.values_mapping = format_path(opts.values_mapping)
+        
     _min_dynamic_level = levels[1]
     if _min_dynamic_level is not None:
         print('min_dynamic_level: ', _min_dynamic_level)
@@ -339,20 +344,16 @@ def main(opts):
     from gio import run_commands
     import os
     
-    _d_out = os.path.join(config.get('conf', 'output'), opts.tag)
-    if not _d_out.startswith('s3://'):
-        _d_out = format_path(os.path.abspath(_d_out))
+    _d_out = format_path(os.path.join(config.get('conf', 'output'), opts.tag))
 
     from gio import file_unzip
     with file_unzip.file_unzip() as _zip:
-        _f_inp = config.get('conf', 'input')
-        if not (_f_inp.startswith('s3://') or _f_inp.startswith('PG:')):
-            _f_inp = os.path.abspath(_f_inp)
+        _f_inp = format_path(config.get('conf', 'input'))
         
         _d_tmp = _zip.generate_file()
         os.makedirs(_d_tmp)
         
-        make(format_path(_f_inp), config.get('conf', 'color'), config.get('conf', 'translate_color'), \
+        make(_f_inp, config.get('conf', 'color'), config.get('conf', 'translate_color'), \
                 opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_tmp, \
                 _d_out, _zip, opts)
                 
@@ -409,6 +410,7 @@ def usage():
     _p.add_argument('--min-value', dest='min_value', type=float)
     _p.add_argument('--max-value', dest='max_value', type=float)
     _p.add_argument('--version', dest='version', type=float, default=2.0)
+    _p.add_argument('--values-mapping', dest='values_mapping')
     _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
             help='remove the tiles previously generated for the layer')
     
