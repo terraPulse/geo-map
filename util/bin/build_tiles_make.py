@@ -12,7 +12,7 @@ Description: make tiling tasks
 import logging
 
 def format_path(p):
-    if p.startswith('s3://') or p.startswith('PG:')):
+    if p.startswith('s3://') or p.startswith('PG:'):
         return p
         
     import os
