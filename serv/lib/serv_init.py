@@ -30,9 +30,14 @@ def op_req(path):
     if _m:
         return serv_op.op(request).get(_m.group(1))
 
-    _m = re.match('map/(.+)', path)
+    _m = re.match('([\w_]+)/(.+)', path)
     if _m:
-        return serv_web.map_obj(request).get(_m.group(1))
+        _tag = _m.group(1)
+        if _tag == 'map':
+            _tag = 'zx_y'
+            
+        if _tag in ('zx_y', 'zxy', 'xyz'):
+            return serv_web.map_obj(request, _tag).get(_m.group(2))
 
     return serv_web.web(request).get(path)
 

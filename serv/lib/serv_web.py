@@ -94,12 +94,13 @@ def load_zips(load=False):
 
 class map_obj(serv_base.service_base):
 
-    def __init__(self, request):
+    def __init__(self, request, order='zx_y'):
         serv_base.service_base.__init__(self, request)
+        self._tile_order = order
 
     def task(self, path):
         from geo_map_util import map_tile_parse
-        return self.output_byte(path, map_tile_parse.get(path))
+        return self.output_byte(path, map_tile_parse.get(path, self._tile_order))
         
         # from gio import file_unzip
         # with file_unzip.zip() as _zip:

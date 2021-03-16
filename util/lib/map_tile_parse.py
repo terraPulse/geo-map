@@ -103,7 +103,7 @@ class map_tile:
         _mask = None
         _min_level = self.min_level
 
-        logging.info('+ %s (%s, %s, %s)' % (len(_jobs), _lev, _col, _row))
+        logging.info('+ %s (%s, %s, %s, %s)' % (len(_jobs), _tag, _lev, _col, _row))
 
         if config.cfg.has_section(_tag):
             _inp = config.get(_tag, 'file', '')
@@ -255,47 +255,69 @@ def _parse_url(f):
     import re
 
     _m = re.search('^(.+)\/(\d+)\/(\d+)\/(\d+).png$', f)
+    if _m is None:
+        logging.warning('failed to parse %s' % f)
+        return None
 
     _tag = _m.group(1)
+    
     _lev = int(_m.group(2))
     _col = int(_m.group(3))
     _row = int(_m.group(4))
     
     return {'tag': _tag, 'lev': _lev, 'col': _col, 'row': _row}
+    
+def _normalize_loc(v, lev, reverse=False):
+    _v = int(v.replace('_', '-'))
+    
+    if reverse:
+        _v = _v * -1
+        
+    if _v >= 0:
+        return _v
+    
+    return (2 ** lev) + _v - 1
 
-def _normalize_path(p):
+def _normalize_path(p, order):
     import re
     _m = re.search('^(.+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)$', p)
     if not _m:
         return None
 
     _tag = _m.group(1)
-    _lev = int(_m.group(2))
-    _col = _m.group(3)
-    _row = _m.group(4)
-
-    _num = 2 ** _lev
-
-    if _col[0] in ('_', '-'):
-        _col = _num - int(_col[1:]) - 1
+    
+    if order == 'zx_y':
+        _lev = int(_m.group(2))
+        _col = _normalize_loc(_m.group(3), _lev)
+        _row = _normalize_loc(_m.group(4), _lev)
+    elif order == 'zxy':
+        _lev = int(_m.group(2))
+        _col = _normalize_loc(_m.group(3), _lev)
+        _row = _normalize_loc(_m.group(4), _lev, reverse=True)
+    elif order == 'xyz':
+        _lev = int(_m.group(4))
+        _col = _normalize_loc(_m.group(2), _lev)
+        _row = _normalize_loc(_m.group(3), _lev, reverse=True)
     else:
-        _col = int(_col)
-
-    if _row[0] in ('_', '-'):
-        _row = _num - int(_row[1:]) - 1
-    else:
-        _row = int(_row)
+        raise Exception('unsupported order request %' % order)
 
     return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
         
-def get(path):
+def get(path, tile_order='zx_y'):
     import os
 
     _path = path
     if not _path:
         _path = '/'
-    _path = _normalize_path(path)
+        
+    _path = _normalize_path(path, tile_order)
+    if not _path:
+        return None
     
-    _out = map_tile().get(**_parse_url(_path))
+    _pss = _parse_url(_path)
+    if _pss is None:
+        return None
+        
+    _out = map_tile().get(**_pss)
     logging.debug('output %s, %s' % (_path, len(_out)))
     return _out
