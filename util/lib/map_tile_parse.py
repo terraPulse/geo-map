@@ -312,6 +312,11 @@ def get(path, tile_order='zx_y'):
         
     _path = _normalize_path(path, tile_order)
     if not _path:
+        from gio import config
+        _f = os.path.join(config.get('general', 'map_path'), path)
+        if os.path.exists(_f):
+            with open(_f, 'rb') as _fi:
+                return _fi.read()
         return None
     
     _pss = _parse_url(_path)
