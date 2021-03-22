@@ -63,7 +63,7 @@ def main(opts):
     _ms = []
     
     _list_maps(_d_out, _ms)
-    _ms = [_format_dir(_m, _d_out) for _m in _ms]
+    _ms = [_format_dir(_m, _d_out) for _m in sorted(_ms)]
     
     _f_out = os.path.join(_d_out, 'list.txt')
     
