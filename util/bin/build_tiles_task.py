@@ -9,6 +9,8 @@ Create: 2015-09-10 16:02:12
 Description:
 '''
 
+import logging
+
 def _make_tile(f, lev, num, col, row, pec, vals, solid_bg, clr, msk, out, params, opts, d_out):
     if opts.level_min is not None:
         if lev < opts.level_min:
@@ -59,6 +61,17 @@ def main(opts):
         from gio import obj
         _met = obj.load(file_mag.get(_f_ini).get())
 
+    if opts.clean_tiles:
+        if _met.version < 2.0:
+            logging.warning('skip cleaning tiles for old versions (<2.0)')
+        else:
+            logging.info('cleaning tiles')
+            print('cleaning tiles')
+            
+            from gio import file_mag
+            _d_out = _out if _out else _tt
+            file_mag.get(os.path.join(_d_out, 'tiles')).remove()
+
     multi_task.run(_make_tile, _tt, opts, (_met, opts, _out))
     print()
 
@@ -69,6 +82,9 @@ def usage():
     _p.add_argument('-t', '--tag', dest='tag', required=True)
     _p.add_argument('-o', '--output', dest='output')
     _p.add_argument('-c', '--cache', dest='cache')
+    
+    _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
+            help='remove the tiles previously generated for the layer')
 
     _p.add_argument('--level-min', dest='level_min', type=int)
     _p.add_argument('--level-max', dest='level_max', type=int)
