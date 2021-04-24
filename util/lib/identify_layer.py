@@ -228,6 +228,9 @@ def _load_setting(tag):
     return _met
     
 def loc(tag, lon, lat):
+    import logging
+    logging.info('query location %s, %s, %s' % (tag, lon, lat))
+    
     if not tag:
         return None
         
@@ -238,6 +241,9 @@ def loc(tag, lon, lat):
     return _vs
     
 def reg(tag, reg, cat=False):
+    import logging
+    logging.info('query polygon %s, %s, %s' % (tag, cat, reg))
+    
     if not tag:
         return None
         
