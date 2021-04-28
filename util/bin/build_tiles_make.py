@@ -331,6 +331,29 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
 
     _obj.save(os.path.join(d_out, 'setting.ini'))
     
+def add_item_to_list(l, d_out):
+    from gio import file_mag
+    import os
+    
+    _f_idx = file_mag.get(os.path.join(d_out, 'list.txt'))
+    
+    _ls = []
+    if _f_idx.exists():
+        with open(_f_idx.get()) as _fi:
+            _ls = _fi.read().strip().splitlines()
+            
+    if l in _ls:
+        return False
+    
+    _ls.append(l)
+    logging.info('add %s to %s (%s)' % (l, _f_idx, len(_ls)))
+    
+    from gio import file_unzip as fz
+    with fz.zip() as _zip:
+        _zip.save('\n'.join(_ls), str(_f_idx))
+        
+    return True
+    
 def main(opts):
     from osgeo import gdal
     gdal.UseExceptions()
@@ -369,11 +392,13 @@ def main(opts):
 
         file_unzip.compress_folder(_d_tmp, _d_out, [])
         
-    if opts.update_list:
+    # update the map list ot add the new layer
+    if True: #opts.update_list:
         print('update map list')
+        add_item_to_list(opts.tag, config.get('conf', 'output'))
         
-        _cmd = 'update_map_list.py -o %s' % config.get('conf', 'output')
-        run_commands.run(_cmd)
+        # _cmd = 'update_map_list.py -o %s' % config.get('conf', 'output')
+        # run_commands.run(_cmd)
 
     if opts.execute:
         print('generate map tiles')
@@ -426,8 +451,8 @@ def usage():
     _p.add_argument('-e', '--execute', dest='execute', type='bool', \
         help='run build_tiles_task.py after the map task is defined')
         
-    _p.add_argument('-u', '--update-list', dest='update_list', type='bool', default=True, \
-        help='run update_map_list.py after the map task is defined')
+    # _p.add_argument('-u', '--update-list', dest='update_list', type='bool', default=True, \
+    #     help='run update_map_list.py after the map task is defined')
 
     return _p
 

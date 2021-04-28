@@ -71,8 +71,8 @@ class map_tile:
         from gio import obj
 
         _out = os.path.join(config.get('general', 'map_path'), tag)
+        
         _f_ini = file_mag.get(os.path.join(_out, 'setting.ini')).get()
-
         if _f_ini:
             _met = obj.load(_f_ini)
         else:
@@ -178,16 +178,19 @@ class map_tile:
         return Image.fromarray(_img)
 
     def _post_proc(self, f, met):
+        from gio import file_mag
+        
+        _f = file_mag.get(f).get()
         if 'burn_band' in met or 'burn_transparency' in met:
             import io
         
-            _img = self._burn(f, met)
+            _img = self._burn(_f, met)
             _buf = io.BytesIO()
             
             _img.save(_buf, format='PNG')
             return _buf.getvalue()
             
-        with open(f, 'rb') as _fi:
+        with open(_f, 'rb') as _fi:
             return _fi.read()
             
     def get(self, tag, lev, col, row):
