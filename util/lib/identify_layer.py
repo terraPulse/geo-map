@@ -6,6 +6,8 @@ Create: 2016-04-30 02:09:18
 Description:
 '''
 
+import logging
+
 def _geojson(txt):
 	from gio import geo_base as gb
 	from osgeo import ogr
@@ -40,7 +42,6 @@ def _create_mak(ext, cell):
 def _reg_mask(geo):
     from gio import rasterize_band as rb
     from gio import geo_raster as ge
-    import logging
     
     if not geo:
         return None
@@ -100,7 +101,6 @@ def _read_block(f, bnd):
     return ge.open(f).get_band().read_block(bnd)
 
 def _median(g):
-    # import logging
     _vs = g.compressed().tolist()
 
     # logging.info(_vs)
@@ -138,7 +138,6 @@ def _categories(g):
 
 def _extract_reg(tag, mak, cat=False):
     from gio import config
-    import logging
     import numpy.ma
     from . import map_values
     
@@ -184,7 +183,6 @@ def _extract_reg(tag, mak, cat=False):
     
 def _extract_pt(tag, lon, lat):
     from gio import config
-    import logging
 
     _met = _load_setting(tag)
     if _met is None:
@@ -216,7 +214,6 @@ def _load_setting(tag):
     import os
     from gio import file_mag
     from gio import config
-    import logging
     
     _f_ini = os.path.join(config.get('general', 'map_path'), tag, 'setting.ini')
     if not file_mag.get(_f_ini).exists():
@@ -229,7 +226,6 @@ def _load_setting(tag):
     return _met
     
 def loc(tag, lon, lat):
-    import logging
     logging.info('query location %s, %s, %s' % (tag, lon, lat))
     
     if not tag:
@@ -242,7 +238,6 @@ def loc(tag, lon, lat):
     return _vs
     
 def reg(tag, reg, cat=False):
-    import logging
     logging.info('query polygon %s, %s, %s' % (tag, cat, reg))
     
     if not tag:
