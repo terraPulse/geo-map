@@ -77,10 +77,11 @@ def _read(f, x, y):
     from gio import geo_raster as ge
     
     if f.endswith('.shp') or f.startswith('PG:'):
-        _div = 0.000025
-        _ext = ge.geo_raster_info([x - _div, _div, 0, y + _div, 0, -_div], 3, 3, ge.proj_from_epsg())
-        _bnd = gx.read_block(f, _ext)
-        return _bnd.read_cell(1, 1)
+        _pt = gb.geo_point(x, y, ge.proj_from_epsg())
+        _bb = gx.load(f, _pt)
+        if _bb is None:
+            return None
+        return _bb.read(_pt)
         
     _bnd = ge.open(f)
     if _bnd is None:
