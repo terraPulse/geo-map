@@ -210,7 +210,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         print('loading color table', _f_clr)
     else:
         import shutil
-        shutil.copy(f_clr, _f_clr)
+        shutil.copy(file_mag.get(f_clr).get(), _f_clr)
 
     if not _f_clr:
         raise Exception('failed to find color table')
