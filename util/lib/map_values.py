@@ -169,8 +169,14 @@ def parse_tag(t, tag, met):
         
     if 'forest_loss' in _t:
         return 'forest_loss'
-        
+
+    if 'loss_year' in _t:
+        return 'forest_loss'
+
     if 'forest_gain' in _t:
+        return 'forest_gain'
+        
+    if 'gain_year' in _t:
         return 'forest_gain'
         
     if 'forest_esta' in _t:
