@@ -89,7 +89,7 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         _d = os.path.join(d_out, 'tiles', str(lev), str(col))
         
     _f = os.path.join(_d, '%s.png' % row)
-    logging.debug('generating tile at %s' % _f)
+    # logging.debug('generating tile at %s' % _f)
     
     if file_mag.get(_f).exists():
         logging.debug('skip %s' % _f)
@@ -106,8 +106,7 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
         _ext = tiles().extent(lev, col, row)
 
         _finp = file_mag.get(f).get()
-
-        logging.debug('generate tile %s' % _f)
+        # logging.debug('generate tile %s' % _f)
         
         _d_tmp = _zip.generate_file()
         os.makedirs(_d_tmp)
@@ -364,7 +363,7 @@ class band:
         if self.color == None:
             raise Exception('no color table provided')
 
-        logging.debug('use internal color table')
+        # logging.debug('use internal color table')
         return self._color(self.color)
 
     def _scale_band(self, bnd, div):
@@ -523,8 +522,7 @@ class band:
                 _finp = _opts.get('input')
                 _offs = _opts.get('offset', 200)
                 
-                logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
-                
+                # logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
                 from gio import band_op
                 _bnd = band_op.burn_band(_bnd, None, _finp, _clrs, _offs)
             
@@ -537,8 +535,7 @@ class band:
                 _vmin = _opts.getfloat('value_min')
                 _vmax = _opts.getfloat('value_max')
                 
-                logging.debug('burn transparency %s, %s, %s' % (_finp, _vmin, _vmax))
-                
+                # logging.debug('burn transparency %s, %s, %s' % (_finp, _vmin, _vmax))
                 from gio import band_op
                 _bnd = band_op.burn_transparency(_bnd, None, _finp, _vmin, _vmax)
         
@@ -588,7 +585,7 @@ class band:
             if _msk:
                 bnd[0].data[_msk.data != 1] = bnd[0].nodata
 
-        if self.region is not None:
+        if self.region:
             from gio import file_unzip as fzip
             with fzip.zip() as _zip:
                 _mask_grid(bnd[0], self.region, _zip)
