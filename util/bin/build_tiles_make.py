@@ -133,54 +133,6 @@ class color_table:
 
         raise None
 
-class tiles:
-
-    def __init__(self):
-        import math
-        from gio import geo_raster as ge
-
-        self.b = 6378137.0
-        self.s = 256
-        self.p = self.b * math.pi
-
-        self.prj = ge.proj_from_epsg(3857)
-
-    def list(self, level, ext=None):
-        from gio import geo_base as gb
-
-        _r = (2 * self.p) / (2 ** level)
-
-        _rows = 2 ** level
-        _cols = 2 ** level
-
-        _num = -1
-        for _row in range(_rows):
-            for _col in range(_cols):
-                _num += 1
-
-                _x = -self.p + (_col * _r)
-                _y = -self.p + (_row * _r)
-
-                _ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
-                if ext is None or _ext.is_intersect(ext):
-                    yield level, _num, _col, _row
-
-    def cell(self, level):
-        _r = (2 * self.p) / (2 ** level)
-        return _r / self.s
-
-    def extent(self, level, col, row):
-        _r = (2 * self.p) / (2 ** level)
-        _c = _r / self.s
-
-        _x = -self.p + (col * _r)
-        _y = -self.p + (row * _r)
-
-        _geo = [_x, _c, 0, _y + _r, 0, -_c]
-
-        from gio import geo_raster as ge
-        return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
-
 def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d_ooo, fzip, opts):
     import os
     from gio import file_mag
@@ -214,37 +166,6 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
 
     if not _f_clr:
         raise Exception('failed to find color table')
-
-    _tiles = tiles()
-
-    _ps = []
-    print(os.path.join(d_ooo, os.path.basename(_f_clr)))
-    for _lev in range(levels[0], levels[1]+1):
-        print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
-        for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
-            _ps.append((f_inp, _lev, _num, _col, _row, percent, valid_vals, opts.solid_bg == True, \
-                    os.path.basename(_f_clr), opts.mask, ''))
-
-    logging.info('found %s task' % len(_ps))
-    print('found %s tasks' % len(_ps))
-
-    # print 'write map.html'
-    # from gio import geo_raster as ge
-    # _ext_geo = _ext.to_polygon().segment_ratio(30).project_to(ge.proj_from_epsg()).extent()
-
-    # _f_out = os.path.join(d_out, 'map.html')
-    # with open(config.cfg.get('conf', 'openlayers_temp'), 'r') as _fi, open(_f_out, 'w') as _fo:
-    #     _fo.write(_fi.read() % {
-    #             'title': os.path.basename(f_inp),
-    #             'xmin': _ext_geo.minx, 'xmax': _ext_geo.maxx,
-    #             'ymin': _ext_geo.miny, 'ymax': _ext_geo.maxy,
-    #             'zmin': levels[0], 'zmax': levels[1]
-    #             })
-
-    print('write to', os.path.join(d_ooo, 'tasks.txt'))
-    with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
-        import pickle
-        pickle.dump(_ps, _fo)
 
     from gio import obj
     _obj = obj.obj()
@@ -309,6 +230,9 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     if _min_dynamic_level is not None:
         print('min_dynamic_level: ', _min_dynamic_level)
         _obj.min_dynamic_level = _min_dynamic_level
+        
+    print('min_static_level: ', levels[0])
+    _obj.min_static_level = levels[0]
 
     _obj.visible = True
     _obj.version = opts.version
@@ -428,7 +352,7 @@ def usage():
     _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
     _p.add_argument('-m', '--mask', dest='mask')
     _p.add_argument('-r', '--region', dest='region')
-    _p.add_argument('-l', '--levels', dest='levels', default=[3, 5], nargs=2, type=int)
+    _p.add_argument('-l', '--levels', dest='levels', default=[3, 9], nargs=2, type=int)
     _p.add_argument('--zero-rate', dest='zero_rate', type=float)
     _p.add_argument('--weights', dest='weights')
     _p.add_argument('--mmu', dest='mmu', type=int, default=0)
