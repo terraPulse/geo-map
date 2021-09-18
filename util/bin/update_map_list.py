@@ -90,6 +90,8 @@ def _format_dir(d, root):
     if not _root.endswith(os.path.sep):
         _root = _root + os.path.sep
     
+    if d.endswith('/'):
+        return d[len(_root): -1]
     return d[len(_root): ]
             
 def main(opts):
