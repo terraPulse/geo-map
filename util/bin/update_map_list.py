@@ -6,16 +6,20 @@ Create: 2019-09-03 01:39:15
 Description:
 '''
 
-def _list_maps(d, ds):
+def _list_maps_local(d, ds, level):
     import os
     import re
     import logging
     
+    if level > 5:
+        return
+    
     if not os.path.exists(d):
         return
 
+    print('checking %s' % os.path.join(d, _d))
+    
     for _d in os.listdir(d):
-        logging.info('checking %s' % os.path.join(d, _d))
         
         if not os.path.isdir(os.path.join(d, _d)):
             continue
@@ -39,7 +43,45 @@ def _list_maps(d, ds):
         if os.path.exists(_f):
             continue
         
-        _list_maps(os.path.join(d, _d), ds)
+        _list_maps_local(os.path.join(d, _d), ds, level=1)
+
+def _list_maps_s3(d, ds, level):
+    import os
+    import re
+    import logging
+    from gio import file_mag
+    
+    if level > 5:
+        return
+    
+    print('checking', str(d))
+    
+    for _d in d.list(recursive=False):
+        _p = str(_d)
+        
+        # logging.info('checking %s' % _p)
+        
+        # if re.match('^\d+$', _f):
+        #     continue
+
+        if not _p.endswith('/'):
+            continue
+        
+        _f = os.path.basename(_p)
+        
+        if _f.startswith('.') or _f.startswith('_'):
+            continue
+        
+        _t = os.path.join(_p, 'setting.ini')
+        if file_mag.get(_t).exists():
+            ds.append(_p)
+            continue
+
+        _t = os.path.join(_p, 'tiles')
+        if file_mag.get(_t).exists():
+            continue
+        
+        _list_maps_s3(_d, ds, level+1)
         
 def _format_dir(d, root):
     import os
@@ -62,7 +104,11 @@ def main(opts):
 
     _ms = []
     
-    _list_maps(_d_out, _ms)
+    if _d_out.startswith('s3://'):
+        _list_maps_s3(file_mag.get(_d_out if _d_out.endswith('/') else _d_out + '/'), _ms, 0)
+    else:
+        _list_maps_local(file_mag.get(_d_out), _ms, 0)
+        
     _ms = [_format_dir(_m, _d_out) for _m in sorted(_ms)]
     
     _f_out = os.path.join(_d_out, 'list.txt')
