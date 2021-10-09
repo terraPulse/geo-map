@@ -263,6 +263,9 @@ def add_item_to_list(l, d_out):
     
     _ls = []
     if _f_idx.exists():
+        if str(_f_idx).startswith('s3://'):
+            os.remove(_f_idx.get())
+    
         with open(_f_idx.get()) as _fi:
             _ls = _fi.read().strip().splitlines()
             
@@ -317,7 +320,7 @@ def main(opts):
         file_unzip.compress_folder(_d_tmp, _d_out, [])
         
     # update the map list ot add the new layer
-    if True: #opts.update_list:
+    if opts.update_list:
         print('update map list')
         add_item_to_list(opts.tag, config.get('conf', 'output'))
         
@@ -375,8 +378,8 @@ def usage():
     _p.add_argument('-e', '--execute', dest='execute', type='bool', \
         help='run build_tiles_task.py after the map task is defined')
         
-    # _p.add_argument('-u', '--update-list', dest='update_list', type='bool', default=True, \
-    #     help='run update_map_list.py after the map task is defined')
+    _p.add_argument('--update-list', dest='update_list', type='bool', default=True, \
+        help='run update_map_list.py after the map task is defined')
 
     return _p
 
