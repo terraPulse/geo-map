@@ -7,19 +7,18 @@ Create: 2016-12-06
 Description: provide functions for generating map tiles
 '''
 
+import math
 import logging
 
 class tiles:
 
     def __init__(self):
-        import math
-        from gio import geo_raster as ge
-
         self.b = 6378137.0
         self.s = 256
         self.p = self.b * math.pi
 
-        self.prj = ge.proj_from_epsg(3857)
+        from gio import geo_base as gb
+        self.prj = gb.proj_from_epsg(3857)
 
     def list(self, level, ext=None):
         from gio import geo_base as gb
@@ -208,24 +207,15 @@ class band:
         self.mask = None
         if f_msk:
             from gio import geo_raster_ex as gx
-            from gio import geo_raster as ge
-
-            self.mask = gx.geo_band_stack_zip.from_shapefile(f_msk, extent=ext) if not f_msk.endswith('.tif') \
-                    else ge.open(f_msk).get_band()
+            self.mask = gx.read_block(f_msk, ext)
                     
         self.region = opts.get('region', None)
         self.fzip = fzip
     
     def _load_file(self, f, lev, ext, fzip):
         from gio import geo_raster_ex as gx
-        from gio import geo_raster as ge
-        
-        if not (f.endswith('.shp') or f.startswith('PG:')):
-            _img = ge.open(fzip.unzip(f))
-            _bnd = [x for x in [_img.get_band(_b + 1) for _b in range(_img.band_num)] if x is not None]
-            return _bnd
-            
-        _bnd = gx.geo_band_stack_zip.from_shapefile(f, file_unzip=fzip, extent=ext)
+
+        _bnd = gx.read_block(f, ext)
         if _bnd is not None:
             return [_bnd]
             
@@ -472,7 +462,12 @@ class band:
             return None
             
         if len(self.bnd) == 1:
-            _zoom = min(int(bnd.geo_transform[1] / self.bnd[0].cell_size), 5)
+            _cell = self.bnd[0].cell_size
+            if self.bnd[0].proj.IsGeographic():
+                # conver the cell size to projected
+                _cell = _cell * 120000
+
+            _zoom = min(int(bnd.geo_transform[1] / _cell), 3)
             _bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg, opts)
 
             if _bnd is None:
