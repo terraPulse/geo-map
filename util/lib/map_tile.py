@@ -512,14 +512,14 @@ class band:
         if 'burn_band' in opts:
             _opts = opts.get('burn_band', {})
             _mlev = _opts.getint('level', 1)
-            if self.level >= _mlev:
-                _clrs = _opts.get('color')
-                _finp = _opts.get('input')
-                _offs = _opts.get('offset', 200)
-                
-                # logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
-                from gio import band_op
-                _bnd = band_op.burn_band(_bnd, None, _finp, _clrs, _offs)
+            
+            _clrs = _opts.get('color')
+            _finp = _opts.get('input')
+            _offs = _opts.get('offset', 200)
+            
+            # logging.debug('burn band %s, %s, %s' % (_finp, _clrs, _offs))
+            from gio import band_op
+            _bnd = band_op.burn_band(_bnd, None, _finp, _clrs, _offs, alpha_only=self.level<_mlev)
             
         if 'burn_transparency' in opts:
             _opts = opts.get('burn_transparency', {})
