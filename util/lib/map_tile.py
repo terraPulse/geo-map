@@ -207,19 +207,26 @@ class band:
         self.mask = None
         if f_msk:
             from gio import geo_raster_ex as gx
-            self.mask = gx.read_block(f_msk, ext)
+            from gio import geo_raster as ge
+
+            self.mask = gx.geo_band_stack_zip.from_shapefile(f_msk, extent=ext) if not f_msk.endswith('.tif') \
+                    else ge.open(f_msk).get_band()
                     
         self.region = opts.get('region', None)
         self.fzip = fzip
     
     def _load_file(self, f, lev, ext, fzip):
+        from gio import geo_raster as ge
         from gio import geo_raster_ex as gx
 
-        _bnd = gx.read_block(f, ext)
+        if not (f.endswith('.shp') or f.startswith('PG:')):
+            _img = ge.open(fzip.unzip(f))
+            _bnd = [x for x in [_img.get_band(_b + 1) for _b in range(_img.band_num)] if x is not None]
+            return _bnd
+
+        _bnd = gx.geo_band_stack_zip.from_shapefile(f, file_unzip=fzip, extent=ext)
         if _bnd is not None:
             return [_bnd]
-            
-        return None
 
     def _color(self, c):
         _cs = {}
@@ -467,7 +474,8 @@ class band:
                 # conver the cell size to projected
                 _cell = _cell * 120000
 
-            _zoom = min(int(bnd.geo_transform[1] / _cell), 3)
+            from gio import config
+            _zoom = min(int(bnd.geo_transform[1] / _cell), config.getfloat('conf', 'max_data_zoom', 3))
             _bnd = self._load_data(self.bnd[0], bnd, _zoom, perc, vals, agg, opts)
 
             if _bnd is None:
