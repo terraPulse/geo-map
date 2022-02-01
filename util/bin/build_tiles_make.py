@@ -49,6 +49,8 @@ def load_shp(f):
     _prj = ge.proj_from_epsg(3857)
 
     _reg = _area.to_polygon().segment_ratio(30).project_to(_prj)
+    if _reg is None:
+        raise Exception('failed to prepare the input file')
     return _reg.extent()
 
 def load_img(f, fzip):
