@@ -316,9 +316,11 @@ def get(path, tile_order='zx_y'):
     _path = _normalize_path(path, tile_order)
     if not _path:
         from gio import config
-        _f = os.path.join(config.get('general', 'map_path'), path)
-        if os.path.exists(_f):
-            with open(_f, 'rb') as _fi:
+        from gio import file_mag
+
+        _f = file_mag.get(os.path.join(config.get('general', 'map_path'), path))
+        if _f.exists():
+            with open(_f.get(), 'rb') as _fi:
                 return _fi.read()
         return None
     

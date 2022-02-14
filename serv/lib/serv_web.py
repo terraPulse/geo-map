@@ -49,7 +49,7 @@ class web(serv_base.service_base):
         from gio import config
         from gio import file_unzip
         from gio import file_mag
-
+        
         _path = path
         if _path == '' or _path == '/':
             _path  = 'index.html'
@@ -57,7 +57,7 @@ class web(serv_base.service_base):
         _d_web = config.get_at('general', 'web_path')
         _f_res = os.path.join(_d_web, _path)
 
-        if file_mag.get(_f_res).exists():
+        if not file_mag.get(_f_res).exists():
             logging.error('no file found %s' % _f_res)
             return
 
@@ -100,7 +100,12 @@ class map_obj(serv_base.service_base):
 
     def task(self, path):
         from geo_map_util import map_tile_parse
-        return self.output_byte(path, map_tile_parse.get(path, self._tile_order))
+
+        _r = map_tile_parse.get(path, self._tile_order)
+        if _r is None:
+            return None
+
+        return self.output_byte(path, _r)
         
         # from gio import file_unzip
         # with file_unzip.zip() as _zip:

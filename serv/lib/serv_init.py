@@ -6,6 +6,8 @@ Create: 2017-11-14 14:11:03
 Description:
 '''
 
+import logging
+
 def not_found(error):
     return 'error (%s)' % error.code, error.code, {'Content-Type': 'application/json'}
 
@@ -25,7 +27,7 @@ def op_req(path):
     import re
     from flask import request
     from . import serv_op, serv_web
-
+    
     _m = re.match('_(.+)', path)
     if _m:
         return serv_op.op(request).get(_m.group(1))
@@ -33,11 +35,12 @@ def op_req(path):
     _m = re.match('([\w_]+)/(.+)', path)
     if _m:
         _tag = _m.group(1)
-        if _tag == 'map':
-            _tag = 'zx_y'
+        if _tag in ('map', 'zx_y', 'zxy', 'xyz'):
+            if _tag == 'map':
+                _tag = 'zx_y'
             
-        if _tag in ('zx_y', 'zxy', 'xyz'):
-            return serv_web.map_obj(request, _tag).get(_m.group(2))
+            _res = serv_web.map_obj(request, _tag).get(_m.group(2))
+            return _res
 
     return serv_web.web(request).get(path)
 
@@ -66,10 +69,14 @@ def op(path):
         logging.error(str(err))
 
         print('\n\n* Error:', err)
+
+        from flask import abort
+        abort(404)
+
         raise err
 
-    # from flask import abort
-    # abort(404)
+    from flask import abort
+    abort(404)
 
 def init():
     from flask import Flask
