@@ -225,8 +225,16 @@ class band:
             return _bnd
 
         _bnd = gx.geo_band_stack_zip.from_shapefile(f, file_unzip=fzip, extent=ext)
-        if _bnd is not None:
-            return [_bnd]
+        if _bnd is None:
+            return None
+        
+        _out = [_bnd] 
+        
+        if _bnd.band_num > 1:
+            for _b in range(2, _bnd.band_num + 1):
+                _out.append(gx.geo_band_stack_zip.from_shapefile(f, file_unzip=fzip, extent=ext, band_idx=_b))
+                
+        return _out
 
     def _color(self, c):
         _cs = {}
@@ -555,7 +563,7 @@ class band:
         for _b in range(min(4, len(bnds))):
             _dat[_b, :, :] = bnds[_b].data
             
-        if self.mask is not None:
+        if self.mask:
             _mmm = self.mask.read_block(_msk)
             if _mmm:
                 _dat[3, :, :][_mmm.data != 1] = 0
@@ -563,12 +571,12 @@ class band:
         _bnd = _msk.from_grid(_dat)
         _bnd = self._burn(_bnd, opts)
         
-        if self.region is not None:
+        if self.region:
             from gio import file_unzip as fzip
             with fzip.zip() as _zip:
                 _mask_grid(_bnd, self.region, _zip)
                 
-        self._save_rgb(_bnd, f)
+        _bnd.to_image().save(f)
 
     def _save_band(self, bnd, cs, f_out, opts):
         if cs == None or list(cs.keys()) == 0:
