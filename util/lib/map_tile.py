@@ -563,6 +563,11 @@ class band:
         for _b in range(min(4, len(bnds))):
             _dat[_b, :, :] = bnds[_b].data
             
+        if len(bnds) < 4:
+            _nod = (bnds[0].data != bnds[0].nodata).astype(np.uint8)
+            _nod[_nod == 1] = 255
+            _dat[3, :, :] = _nod
+            
         if self.mask:
             _mmm = self.mask.read_block(_msk)
             if _mmm:
