@@ -186,7 +186,7 @@ def main(opts):
     # _tt = multi_task.load(_ps, opts)
     # print('%s tasks' % len(_tt))
     
-    _f_ini = os.path.join(_out, 'setting.ini')
+    _f_ini = opts.setting or os.path.join(_out, 'setting.ini')
     
     if not file_mag.get(_f_ini).exists():
         logging.error('failed to find setting file: %s' % _f_ini)
@@ -232,6 +232,7 @@ def usage():
     _p.add_argument('-d', '-i', '--input', dest='input')
     _p.add_argument('-t', '--tag', dest='tag', required=True)
     _p.add_argument('-o', '--output', dest='output')
+    _p.add_argument('-s', '--setting', dest='setting')
     _p.add_argument('-c', '--cache', dest='cache')
     
     _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
