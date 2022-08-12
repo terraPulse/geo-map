@@ -20,11 +20,11 @@ class op(serv_base.service_base):
         from geo_map_util import identify_layer as il
         return self.output_json(il.loc(tag, x, y))
 
-    def _reg(self, tag, reg, v):
-        logging.info('reg query: tag (%s)' % (tag, ))
+    def _reg(self, tag, reg, v, agg, val_min, val_max):
+        logging.info('reg query: tag (%s) %s (%s, %s)' % (tag, agg, val_min, val_max))
 
         from geo_map_util import identify_layer as il
-        return self.output_json(il.reg(tag, reg))
+        return self.output_json(il.reg(tag, reg, False, agg, val_min, val_max))
 
     def _cat(self, tag, reg, v):
         logging.info('cat query: tag (%s)' % (tag, ))
@@ -209,8 +209,12 @@ class op(serv_base.service_base):
             _tag = self.pp('tag')
             _v = self.pp('v', 'json')
             _geo = self.pp('geo')
+            
+            _agg = self.pp('agg', 'median')
+            _val_min = self.pf('val_min')
+            _val_max = self.pf('val_max')
 
-            return self._reg(_tag, _geo, _v)
+            return self._reg(_tag, _geo, _v, _agg, _val_min, _val_max)
 
         if path == 'query/cat':
             _tag = self.pp('tag')

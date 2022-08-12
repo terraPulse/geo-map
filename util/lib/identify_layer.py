@@ -110,6 +110,15 @@ def _median(g):
     _vs.sort()
     return _vs[len(_vs) // 2]
     
+def _mean(g):
+    _vs = g.compressed().tolist()
+
+    # logging.info(_vs)
+    if len(_vs) == 0:
+        return None
+
+    return sum(_vs) / len(_vs)
+    
 def _categories(g):
     _vs = g.compressed().tolist()
 
@@ -136,7 +145,7 @@ def _categories(g):
 
     return _rs
 
-def _extract_reg(tag, mak, cat=False):
+def _extract_reg(tag, mak, cat=False, agg='median', val_min=None, val_max=None):
     from gio import config
     import numpy.ma
     from . import map_values
@@ -158,13 +167,15 @@ def _extract_reg(tag, mak, cat=False):
     _msk = (mak.data != 1) | (_bd.data == _bd.nodata)
     
     # use min and max values
-    _min_val = _met.get('min_value')
+    _min_val = _met.get('min_value') if val_min is None else val_min
     if _min_val is not None:
-        _msk = _msk | _bd.data < _min_val
+        logging.info('apply min value: %s' % _min_val)
+        _msk = _msk | (_bd.data < _min_val)
     
-    _max_val = _met.get('max_value')
+    _max_val = _met.get('max_value') if val_max is None else val_max
     if _max_val is not None:
-        _msk = _msk | _bd.data > _max_val
+        logging.info('apply max value: %s' % _max_val)
+        _msk = _msk | (_bd.data > _max_val)
     
     _da = numpy.ma.array(_bd.data, mask=_msk)
     
@@ -179,7 +190,13 @@ def _extract_reg(tag, mak, cat=False):
             
         return map_values.categories(tag, None, _met, _cs)
         
-    return map_values.text(tag, None, _met, _median(_da))
+    if agg == 'median':
+        return map_values.text(tag, None, _met, _median(_da))
+    
+    if agg == 'mean':
+        return map_values.text(tag, None, _met, _mean(_da))
+        
+    raise Exception('supported aggregation %s' % agg)
     
 def _extract_pt(tag, lon, lat):
     from gio import config
@@ -237,7 +254,7 @@ def loc(tag, lon, lat):
         _vs.append(_extract_pt(_t, lon, lat))
     return _vs
     
-def reg(tag, reg, cat=False):
+def reg(tag, reg, cat=False, agg='median', val_min=None, val_max=None):
     logging.info('query polygon %s, %s, %s' % (tag, cat, reg))
     
     if not tag:
@@ -251,7 +268,7 @@ def reg(tag, reg, cat=False):
     import re
     _vs = []
     for _t in re.split('[;,]', tag):
-        _vs.append(_extract_reg(_t, _mak, cat))
+        _vs.append(_extract_reg(_t, _mak, cat, agg, val_min, val_max))
     return _vs
 
 def main(opts):
