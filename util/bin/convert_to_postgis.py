@@ -26,7 +26,7 @@ def shp_to_psql(f_shp, tag):
     _g = lambda x: config.get('pgdb', x)
     _con = 'PG:host=%s user=%s dbname=%s password=%s' % (_g('host'), _g('user'), _g('dbname'), _g('password'))
     
-    _tag = 'map_%s' % ('_'.join(tag.split('/')))
+    _tag = 'map_%s' % ('_'.join(tag.split('/'))).replace('-', '_')
         
     _cmd = ("ogr2ogr -f 'PostgreSQL' '%s' '%s' -lco GEOMETRY_NAME=geom " \
             + "-lco FID=gid -lco PRECISION=no -nlt GEOMETRY -nln %s -overwrite") \
