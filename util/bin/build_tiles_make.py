@@ -201,6 +201,9 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
     _obj = obj.obj()
 
     _obj.file = _f_inp
+    if _f_inp != f_inp:
+        _obj.origin = f_inp
+        
     if percent is not None:
         _obj.percent = percent
     if title:
@@ -293,7 +296,7 @@ def main(opts):
         opts.burn_band_input = 'dem/aw3d30/hillshade-lit'
         opts.burn_band_offset = 200
         opts.burn_band_level = 1
-
+        
     from gio import config
     from gio import run_commands
     import os
@@ -380,7 +383,7 @@ def usage():
     _p.add_argument('--burn-transparency-input', dest='burn_transparency_input')
     _p.add_argument('--burn-transparency-level', dest='burn_transparency_level', type=int, default=1)
 
-    _p.add_argument('-e', '--execute', dest='execute', type='bool', \
+    _p.add_argument('-b', '-e', '--execute', dest='execute', type='bool', \
         help='run build_tiles_task.py after the map task is defined')
         
     _p.add_argument('--update-list', dest='update_list', type='bool', default=True, \

@@ -31,15 +31,9 @@ def shp_to_psql(f_shp, tag=None, overwrite=False):
     from gio import config
     from gio import file_mag
     
-    if f_shp.lower().endswith('.shp'):
-        _shp = file_mag.get(f_shp).get()
-        if not _shp:
-            logging.warning('failed to get the input shapefile')
-            return None
-    else:
-        if not f_shp.startwith('PG:'):
-            logging.warning('only supports shapefile or PG input')
-            return None
+    if not (f_shp.lower().endswith('.shp') or f_shp.startwith('PG:')):
+        logging.warning('only supports shapefile or PG input')
+        return None
         
     _g = lambda x: config.get('pgdb', x)
     if not _g('host'):
@@ -48,21 +42,32 @@ def shp_to_psql(f_shp, tag=None, overwrite=False):
     _con = 'PG:host=%s user=%s dbname=%s password=%s' % (_g('host'), _g('user'), _g('dbname'), _g('password'))
     
     import re
-    _tag = 'map_%s' % (re.sub('[^\w\d]', '_', tag))
+    _tag = 'map_%s' % (re.sub('[^\w\d]', '_', tag.lower()))
     
     _out = _con + ' tables=%s' % _tag
-    if pg_lyr_exists(_out) and overwrite == False:
+    if overwrite == False and pg_lyr_exists(_out):
         logging.info('PG layer (%s) already exists' % _tag)
         return _out 
         
+    if f_shp.lower().endswith('.shp'):
+        _shp = file_mag.get(f_shp).get()
+        if not _shp:
+            logging.warning('failed to get the input shapefile')
+            return None
+        
     _cmd = ("ogr2ogr -f 'PostgreSQL' '%s' '%s' -lco GEOMETRY_NAME=geom " \
-            + "-lco FID=gid -lco PRECISION=no -nlt GEOMETRY -nln %s -overwrite") \
+            + "-lco FID=gid -lco PRECISION=no -nln %s -overwrite") \
             % (_con, _shp, _tag)
+            
+    # _cmd = ("ogr2ogr -t_srs 'EPSG:4326' -f 'PostgreSQL' '%s' '%s' -lco GEOMETRY_NAME=geom " \
+    #         + "-lco FID=gid -lco PRECISION=no -nlt GEOMETRY -nln %s -overwrite") \
+    #         % (_con, _shp, _tag)
     
     from gio import run_commands as run
     run.run(_cmd)
     
     if not pg_lyr_exists(_out):
+        print(_cmd)
         logging.error('failed to create PG layer %s' % _tag)
         return None
         
