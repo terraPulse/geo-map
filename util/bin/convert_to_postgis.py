@@ -15,28 +15,6 @@ def copy_tiles(d_inp, d_out):
     from gio import run_commands as run
     run.run(_cmd)
     
-def shp_to_psql(f_shp, tag):
-    from gio import config
-    from gio import file_mag
-    
-    _shp = file_mag.get(f_shp).get()
-    if not _shp:
-        raise Exception('failed to get the input shapefile')
-        
-    _g = lambda x: config.get('pgdb', x)
-    _con = 'PG:host=%s user=%s dbname=%s password=%s' % (_g('host'), _g('user'), _g('dbname'), _g('password'))
-    
-    _tag = 'map_%s' % ('_'.join(tag.split('/'))).replace('-', '_')
-        
-    _cmd = ("ogr2ogr -f 'PostgreSQL' '%s' '%s' -lco GEOMETRY_NAME=geom " \
-            + "-lco FID=gid -lco PRECISION=no -nlt GEOMETRY -nln %s -overwrite") \
-            % (_con, _shp, _tag)
-    
-    # from gio import run_commands as run
-    # run.run(_cmd)
-    
-    return _con + ' tables=%s' % _tag
-
 def migrate(d_inp, tag_inp, d_out, tag_out):
     import os
     import re
@@ -60,6 +38,10 @@ def migrate(d_inp, tag_inp, d_out, tag_out):
     
     _b_cvt = d_inp == d_out and tag_inp == tag_out
     
+    if not file_mag.get(_f_cfg).exists():
+        logging.warning('no setting file (%s)' % _f_cfg)
+        return False
+    
     _cfg = obj.load(_f_cfg)
     _old = _cfg.get('version', 1) < 2
     
@@ -73,12 +55,22 @@ def migrate(d_inp, tag_inp, d_out, tag_out):
     _inp = _cfg.file
     logging.info('input data file %s' % _cfg.file)
     
-    if _inp.startswith('PG'):
+    if _inp.startswith('PG:'):
         logging.warning('the input file is already in PG')
         return False
     
-    _con = shp_to_psql(_inp, tag_out)
+    if not _inp.lower().endswith('.shp'):
+        logging.warning('the input file (%s) is not a shapefile' % _inp)
+        return False
+        
+    from geo_map_util import map_tile_util
+    _con = map_tile_util.shp_to_psql(_inp, tag_out)
+    if not _con:
+        logging.error('failed to convert the file (%s) to PostGIS' % _inp)
+        return False
+        
     _cfg.file = _con
+    _cfg.origin = _inp
     
     logging.info('output setting file %s' % _f_ccc)
     _cfg.save(_f_ccc)
@@ -133,7 +125,7 @@ def main(opts):
     
     _f_ini = file_mag.get(os.path.join(_d_out, _tag_out, 'setting.ini')).get()
     if os.path.exists(_f_ini):
-        os.remote(_f_ini)
+        os.remove(_f_ini)
 
 def usage():
     _p = environ_mag.usage(False)

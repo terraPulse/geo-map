@@ -134,17 +134,45 @@ class color_table:
             return _is.get('FILE', _is.get('file'))
 
         raise None
+        
+def to_pg(f, tag=None, overwrite=True):
+    if f.startswith('PG:'):
+        return f
+        
+    if not f.lower().endswith('.shp'):
+        return f
+        
+    from gio import config
+    if not config.getboolean('conf', 'convert_to_postgis', True):
+        return f
+        
+    from geo_map_util import map_tile_util
+    
+    _tag = tag
+    if not _tag:
+        import os
+        _tag = os.path.basename(f)[:-4]
+        
+    _c = map_tile_util.shp_to_psql(f, _tag)
+    if not _c:
+        raise Exception('failed to convert to PostGIS (%s, %s)' % (f, _tag))
+        
+    logging.info('converted %s to PostGIS table (%s)' % (f, _c))
+    return _c
 
-def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d_ooo, fzip, opts):
+def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d_ooo, fzip, opts):
     import os
     from gio import file_mag
-
-    _f = f_inp if f_inp.startswith('PG:') else file_mag.get(f_inp).get()
+    from gio import config
+    
+    _f_inp = to_pg(f_inp, tag)
+    
+    _f = _f_inp if _f_inp.startswith('PG:') else file_mag.get(_f_inp).get()
     if not _f:
-        raise Exception('failed to load %s' % f_inp)
+        raise Exception('failed to load %s' % _f_inp)
 
     # detect the extent of input file
-    _ext = load_shp(_f) if f_inp.endswith('.shp') or f_inp.upper().startswith('PG:') else load_img(_f, fzip)
+    _ext = load_shp(_f) if _f_inp.endswith('.shp') or _f_inp.upper().startswith('PG:') else load_img(_f, fzip)
     if opts.region:
         _rrr = load_shp(opts.region)
         _ext = _ext.intersect(_rrr)
@@ -172,7 +200,7 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
     from gio import obj
     _obj = obj.obj()
 
-    _obj.file = f_inp
+    _obj.file = _f_inp
     if percent is not None:
         _obj.percent = percent
     if title:
@@ -182,10 +210,10 @@ def make(f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d
         _obj.valid_vals = valid_vals
 
     if opts.mask:
-        _obj.mask = opts.mask
+        _obj.mask = to_pg(opts.mask, None, False)
 
     if opts.region:
-        _obj.region = opts.region
+        _obj.region = to_pg(opts.region, None, False)
 
     if opts.solid_bg:
         _obj.solid_bg = True
@@ -279,7 +307,7 @@ def main(opts):
         _d_tmp = _zip.generate_file()
         os.makedirs(_d_tmp)
         
-        make(_f_inp, config.get('conf', 'color'), config.get('conf', 'translate_color'), \
+        make(opts.tag, _f_inp, config.get('conf', 'color'), config.get('conf', 'translate_color'), \
                 opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_tmp, \
                 _d_out, _zip, opts)
                 
