@@ -153,7 +153,7 @@ def to_pg(f, tag=None, overwrite=True):
         import os
         _tag = os.path.basename(f)[:-4]
         
-    _c = map_tile_util.shp_to_psql(f, _tag)
+    _c = map_tile_util.shp_to_psql(f, _tag, overwrite=overwrite)
     if not _c:
         raise Exception('failed to convert to PostGIS (%s, %s)' % (f, _tag))
         
@@ -165,7 +165,7 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
     from gio import file_mag
     from gio import config
     
-    _f_inp = to_pg(f_inp, tag)
+    _f_inp = to_pg(f_inp, tag, True)
     
     _f = _f_inp if _f_inp.startswith('PG:') else file_mag.get(_f_inp).get()
     if not _f:

@@ -56,7 +56,7 @@ def shp_to_psql(f_shp, tag=None, overwrite=False):
             return None
         
     _cmd = ("ogr2ogr -f 'PostgreSQL' '%s' '%s' -lco GEOMETRY_NAME=geom " \
-            + "-lco FID=gid -lco PRECISION=no -nln %s -overwrite") \
+            + "-lco FID=gid -lco PRECISION=no -nlt GEOMETRY -nln %s -overwrite") \
             % (_con, _shp, _tag)
             
     # _cmd = ("ogr2ogr -t_srs 'EPSG:4326' -f 'PostgreSQL' '%s' '%s' -lco GEOMETRY_NAME=geom " \
@@ -67,7 +67,7 @@ def shp_to_psql(f_shp, tag=None, overwrite=False):
     run.run(_cmd)
     
     if not pg_lyr_exists(_out):
-        print(_cmd)
+        logging.warning(_out)
         logging.error('failed to create PG layer %s' % _tag)
         return None
         
