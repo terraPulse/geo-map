@@ -60,7 +60,7 @@ class service_base:
         if _f.exists():
             import os
             _n = file_name if file_name else os.path.basename(f)
-            return flask.send_file(_f.get(), as_attachment=attachment, attachment_filename=_n)
+            return flask.send_file(_f.get(), as_attachment=attachment, download_name=_n)
             
         return self.output_byte(f, '')
 
