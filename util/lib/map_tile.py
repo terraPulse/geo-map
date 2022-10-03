@@ -501,10 +501,13 @@ class band:
             if _val is not None and _bnd.nodata is not None:
                 _bnd.data[_bnd.data == _bnd.nodata] = _val
                 
-            _mmu = opts.get('mmu', 0)
-            if _mmu > 0:
-                from gio import mod_filter
-                mod_filter.filter_band_mmu(_bnd, num=_mmu)
+            if False:
+                # disalbe MMU because of skimage library
+                _mmu = opts.get('mmu', 0)
+                
+                if _mmu > 0:
+                    from gio import mod_filter
+                    mod_filter.filter_band_mmu(_bnd, num=_mmu)
 
             # _bnd.save('test_data2.tif')
 
