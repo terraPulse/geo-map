@@ -181,14 +181,14 @@ class map_tile:
         from gio import file_mag
         
         _f = file_mag.get(f).get()
-        if 'burn_band' in met or 'burn_transparency' in met:
-            import io
+        # if 'burn_band' in met or 'burn_transparency' in met:
+        #     import io
         
-            _img = self._burn(_f, met)
-            _buf = io.BytesIO()
+        #     _img = self._burn(_f, met)
+        #     _buf = io.BytesIO()
             
-            _img.save(_buf, format='PNG')
-            return _buf.getvalue()
+        #     _img.save(_buf, format='PNG')
+        #     return _buf.getvalue()
             
         with open(_f, 'rb') as _fi:
             return _fi.read()

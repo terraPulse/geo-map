@@ -7,3 +7,4 @@ pandas
 psycopg2
 pillow
 flask
+scikit-image
