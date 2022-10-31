@@ -4,6 +4,10 @@ Author: Min Feng
 Description: parse the URL, process and return the output tile
 '''
 
+import os
+from gio import file_unzip
+from gio import file_mag
+from gio import config
 import logging
 
 _jobs = []
@@ -178,12 +182,11 @@ class map_tile:
         return Image.fromarray(_img)
 
     def _post_proc(self, f, met):
-        from gio import file_mag
-        
+        if not f:
+            return None
+            
         _f = file_mag.get(f).get()
         if 'burn_band' in met or 'burn_transparency' in met:
-            import io
-        
             _img = self._burn(_f, met)
             with open(_f, 'wb') as _fo:
                 _img.save(_fo, format='PNG')
@@ -195,15 +198,13 @@ class map_tile:
             # _img.save(_buf, format='PNG')
             # return _buf.getvalue()
             
-        with open(_f, 'rb') as _fi:
+        return _f
+        
+    def _read_file(self, f):
+        with open(file_mag.get(f).get(), 'rb') as _fi:
             return _fi.read()
             
     def get(self, tag, lev, col, row):
-        import os
-        from gio import file_unzip
-        from gio import file_mag
-        from gio import config
-        
         _met = self._load_setting(tag, lev, col, row)
         
         _d_web = config.get_at('general', 'map_path')
@@ -221,15 +222,19 @@ class map_tile:
                 _tmp = _zip.generate_file()
                 config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
 
-            if not file_mag.get(_out).exists():
-                logging.debug('generating map tile (%s)' % _out)
-                self._dmap_mag_single(_met)
+            if file_mag.get(_out).exists():
+                return self._read_file(_out)
+                
+            logging.debug('generating map tile (%s)' % _out)
+            self._dmap_mag_single(_met)
 
-                logging.debug('get tile %s' % _out)
-                if not file_mag.get(_out).exists():
-                    _out = config.get('general', 'nodata_file')
-
-            return self._post_proc(_out, _met)
+            logging.debug('get tile %s' % _out)
+            if  file_mag.get(_out).exists():
+                _out = self._post_proc(_out, _met)
+            else:
+                _out = config.get('general', 'nodata_file')
+            
+            return self._read_file(_out)
 
         raise Exception('no module found %s' % tag)
 
