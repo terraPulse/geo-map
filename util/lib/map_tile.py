@@ -525,8 +525,8 @@ class band:
             return [self.bnd[_b].read_block(bnd) for _b in range(len(self.bnd))]
             
     def _burn(self, bnd, opts):
-        # _bnd = bnd
-        # return bnd
+        _bnd = bnd
+        return bnd
         
         if 'burn_band' in opts:
             _opts = opts.get('burn_band', {})

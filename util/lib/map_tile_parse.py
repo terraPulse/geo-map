@@ -120,7 +120,7 @@ class map_tile:
         _mask = met.get('mask')
         _min_level = met.get('min_dynamic_level', self.min_level)
 
-        if _lev < _min_level:
+        if config.getboolean('conf', 'skip_low_levels', True) and _lev < _min_level:
             logging.warning('skip level %s < %s' % (_lev, _min_level))
             return
 
@@ -181,14 +181,19 @@ class map_tile:
         from gio import file_mag
         
         _f = file_mag.get(f).get()
-        # if 'burn_band' in met or 'burn_transparency' in met:
-        #     import io
+        if 'burn_band' in met or 'burn_transparency' in met:
+            import io
         
-        #     _img = self._burn(_f, met)
-        #     _buf = io.BytesIO()
-            
-        #     _img.save(_buf, format='PNG')
-        #     return _buf.getvalue()
+            _img = self._burn(_f, met)
+            with open(_f, 'wb') as _fo:
+                _img.save(_fo, format='PNG')
+                
+            if f != _f:
+                file_mag.get(f).put(_f)
+                
+            # _buf = io.BytesIO()
+            # _img.save(_buf, format='PNG')
+            # return _buf.getvalue()
             
         with open(_f, 'rb') as _fi:
             return _fi.read()

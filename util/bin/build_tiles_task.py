@@ -145,6 +145,12 @@ def create_tasks(met, opts, levels, fzip):
     #     pickle.dump(_ps, _fo)
 
 def make_tile(lev, num, col, row, params, opts, inp):
+    _tag = opts.tag
+    _loc = '%s/%s/%s/%s.png' % (opts.tag, lev, col, row)
+    
+    from geo_map_util import map_tile_parse
+    return map_tile_parse.get(_loc)
+
     import os
     from gio import config
     
@@ -213,6 +219,8 @@ def main(opts):
             _d_out = _out if _out else _tt
             file_mag.get(os.path.join(_d_out, 'tiles')).remove()
             
+    config.set('conf', 'skip_low_levels', False)
+    
     from gio import file_unzip
     with file_unzip.zip() as _zip:
         _tt = create_tasks(_met, opts, opts.levels, _zip)
