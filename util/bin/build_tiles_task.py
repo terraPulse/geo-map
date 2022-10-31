@@ -183,6 +183,9 @@ def main(opts):
     from gio import config
     from gio import file_mag
     
+    config.set('conf', 'skip_low_levels', False)
+    config.set('general', 'map_path', config.get('conf', 'input'))
+    
     _out = os.path.join(config.get('conf', 'input'), opts.tag)
 
     # with open(file_mag.get(os.path.join(_out, 'tasks.txt')).get(), 'rb') as _fi:
@@ -219,8 +222,6 @@ def main(opts):
             _d_out = _out if _out else _tt
             file_mag.get(os.path.join(_d_out, 'tiles')).remove()
             
-    config.set('conf', 'skip_low_levels', False)
-    
     from gio import file_unzip
     with file_unzip.zip() as _zip:
         _tt = create_tasks(_met, opts, opts.levels, _zip)
