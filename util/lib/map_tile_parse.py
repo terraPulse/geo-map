@@ -240,7 +240,7 @@ class map_tile:
             else:
                 _ooo = config.get('general', 'nodata_file')
                 if config.getboolean('conf', 'keep_nodata_tiles', True):
-                    _out_file.put(_ooo)
+                    _out_file.put(file_mag.get(_ooo).get())
             
             return self._read_file(_ooo)
 
