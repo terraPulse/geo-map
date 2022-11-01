@@ -191,8 +191,8 @@ class map_tile:
             with open(_f, 'wb') as _fo:
                 _img.save(_fo, format='PNG')
                 
-            if f != _f:
-                file_mag.get(f).put(_f)
+            # if f != _f:
+            #     file_mag.get(f).put(_f)
                 
             # _buf = io.BytesIO()
             # _img.save(_buf, format='PNG')
@@ -208,13 +208,14 @@ class map_tile:
         _met = self._load_setting(tag, lev, col, row)
         
         _d_web = config.get_at('general', 'map_path')
-        logging.debug('map path: %s' % _d_web)
+        # logging.debug('map path: %s' % _d_web)
     
         if _met.get('version', 1.0) >= 2.0:
             _out = os.path.join(_d_web, _met.tag, 'tiles', '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
         else:
             _out = os.path.join(_d_web, _met.tag, '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
-        logging.debug('request tile %s' % _out)
+            
+        # logging.debug('request tile %s' % _out)
 
         with file_unzip.zip() as _zip:
             _cache = config.get('conf', 'cache', None)
@@ -225,16 +226,23 @@ class map_tile:
             if file_mag.get(_out).exists():
                 return self._read_file(_out)
                 
-            logging.debug('generating map tile (%s)' % _out)
+            # logging.debug('generating map tile (%s)' % _out)
             self._dmap_mag_single(_met)
 
-            logging.debug('get tile %s' % _out)
-            if  file_mag.get(_out).exists():
-                _out = self._post_proc(_out, _met)
-            else:
-                _out = config.get('general', 'nodata_file')
+            # logging.debug('get tile %s' % _out)
+            _out_file = file_mag.get(_out)
+            _is_nodata = not _out_file.exists()
             
-            return self._read_file(_out)
+            if not _is_nodata:
+                _ooo = self._post_proc(_out, _met)
+                if _out != _ooo:
+                    _out_file.put(_ooo)
+            else:
+                _ooo = config.get('general', 'nodata_file')
+                if config.getboolean('conf', 'keep_nodata_tiles', True):
+                    _out_file.put(_ooo)
+            
+            return self._read_file(_ooo)
 
         raise Exception('no module found %s' % tag)
 
