@@ -92,6 +92,14 @@ def load_shp(f):
     _reg = _area.to_polygon().segment_ratio(30).project_to(_prj)
     return _reg.extent()
 
+def load_img(f, fzip):
+    from gio import geo_raster as ge
+
+    _prj = ge.proj_from_epsg(3857)
+    _reg = ge.open(fzip.unzip(f)).extent().to_polygon().segment_ratio(30).project_to(_prj)
+
+    return _reg.extent()
+
 def create_tasks(met, opts, levels, fzip):
     import os
     from gio import file_mag
