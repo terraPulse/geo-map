@@ -143,7 +143,7 @@ def to_pg(f, tag=None, overwrite=True):
         return f
         
     from gio import config
-    if not config.getboolean('conf', 'convert_to_postgis', True):
+    if not config.getboolean('conf', 'convert_to_postgis', False):
         return f
         
     from geo_map_util import map_tile_util
