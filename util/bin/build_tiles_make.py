@@ -355,7 +355,7 @@ def usage():
     _p.add_argument('-c', '--color', dest='color')
     _p.add_argument('--translate-color', dest='translate_color')
     _p.add_argument('-t', '--tag', dest='tag', required=True)
-    _p.add_argument('-a', '--agg', dest='agg')
+    _p.add_argument('-a', '--agg', dest='agg', default='median')
     _p.add_argument('--title', dest='title')
     _p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
     _p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
