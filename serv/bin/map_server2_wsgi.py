@@ -101,4 +101,3 @@ if __name__ == '__main__':
     environ_mag.init_path()
     environ_mag.run(main, [environ_mag.config(usage())])
 
-
