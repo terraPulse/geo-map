@@ -157,10 +157,11 @@ def gee_ndvi(x, y, date_s=None, date_e=None):
     import datetime
     _now = datetime.datetime.now().strftime('%Y-%m-%d')
 
-    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDVI_8, _s('2013-04-11'), _e(_now))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDVI_457, _s('1999-01-01'), _e(_now))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDVI_457, _s('1984-01-01'), _e(_now))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDVI_457, _s('1982-08-22'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC09/C02/T1_TOA', add_NDVI_8, _s('2021-10-31'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C02/T1_TOA', add_NDVI_8, _s('2013-04-11'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C02/T1_TOA', add_NDVI_457, _s('1999-01-01'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C02/T1_TOA', add_NDVI_457, _s('1984-01-01'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C02/T1_TOA', add_NDVI_457, _s('1982-08-22'), _e(_now))
 
     logging.info('found %s images' % (len(_ls.keys())))
     return _ls
@@ -174,11 +175,17 @@ def gee_ndsi(x, y, date_s=None, date_e=None):
 
     _s = lambda x: date_s if date_s and (date_s > x) else x
     _e = lambda x: date_e if date_e and (date_e < x) else x
+    
+    logging.info('query dates: %s - %s' % (date_s, date_e))
+    
+    import datetime
+    _now = datetime.datetime.now().strftime('%Y-%m-%d')
 
-    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDSI_8, _s('2013-04-11'), _e('2019-09-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDSI_457, _s('1999-01-01'), _e('2013-04-11'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDSI_457, _s('1984-01-01'), _e('1999-01-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDSI_457, _s('1982-08-22'), _e('1984-01-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC09/C02/T1_TOA', add_NDSI_8, _s('2021-10-31'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C02/T1_TOA', add_NDSI_8, _s('2013-04-11'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C02/T1_TOA', add_NDSI_457, _s('1999-01-01'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C02/T1_TOA', add_NDSI_457, _s('1984-01-01'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C02/T1_TOA', add_NDSI_457, _s('1982-08-22'), _e(_now))
 
     return _ls
 
@@ -191,11 +198,17 @@ def gee_ndwi(x, y, date_s=None, date_e=None):
 
     _s = lambda x: date_s if date_s and (date_s > x) else x
     _e = lambda x: date_e if date_e and (date_e < x) else x
+    
+    logging.info('query dates: %s - %s' % (date_s, date_e))
+    
+    import datetime
+    _now = datetime.datetime.now().strftime('%Y-%m-%d')
 
-    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C01/T1_TOA', add_NDWI_8, _s('2013-04-11'), _e('2019-09-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C01/T1_TOA', add_NDWI_457, _s('1999-01-01'), _e('2013-04-11'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C01/T1_TOA', add_NDWI_457, _s('1984-01-01'), _e('1999-01-01'))
-    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C01/T1_TOA', add_NDWI_457, _s('1982-08-22'), _e('1984-01-01'))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC09/C02/T1_TOA', add_NDWI_8, _s('2021-10-31'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LC08/C02/T1_TOA', add_NDWI_8, _s('2013-04-11'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LE07/C02/T1_TOA', add_NDWI_457, _s('1999-01-01'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT05/C02/T1_TOA', add_NDWI_457, _s('1984-01-01'), _e(_now))
+    add_landsat_records(_pt, _ls, 'LANDSAT/LT04/C02/T1_TOA', add_NDWI_457, _s('1982-08-22'), _e(_now))
 
     return _ls
 
