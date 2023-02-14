@@ -241,7 +241,7 @@ def main(opts):
     #     _tt = [_t[:-1] + (_d_out, ) for _t in _tt]
 
     from gio import multi_task
-    multi_task.run(make_tile, _tt, opts, (_met, opts, _out))
+    multi_task.run(make_tile, multi_task.load(_tt, opts), opts, (_met, opts, _out))
     print()
 
 def usage():
