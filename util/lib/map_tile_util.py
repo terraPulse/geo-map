@@ -39,7 +39,8 @@ def shp_to_psql(f_shp, tag=None, overwrite=False):
     if not _g('host'):
         raise Exception('no PostGIS connection provided')
         
-    _con = 'PG:host=%s user=%s dbname=%s password=%s' % (_g('host'), _g('user'), _g('dbname'), _g('password'))
+    _con = 'PG:host=%s port=%s user=%s dbname=%s password=%s' % (\
+                _g('host'), _g('port'), _g('user'), _g('dbname'), _g('password'))
     
     import re
     _tag = 'map_%s' % (re.sub('[^\w\d]', '_', tag.lower()))
