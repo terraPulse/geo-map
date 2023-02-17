@@ -213,10 +213,10 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
         _obj.valid_vals = valid_vals
 
     if opts.mask:
-        _obj.mask = to_pg(opts.mask, None, False)
+        _obj.mask = to_pg(opts.mask, None, opts.overwrite_pg_layer)
 
     if opts.region:
-        _obj.region = to_pg(opts.region, None, False)
+        _obj.region = to_pg(opts.region, None, opts.overwrite_pg_layer)
 
     if opts.solid_bg:
         _obj.solid_bg = True
@@ -357,7 +357,8 @@ def usage():
     _p.add_argument('-t', '--tag', dest='tag', required=True)
     _p.add_argument('-a', '--agg', dest='agg', default='median')
     _p.add_argument('--title', dest='title')
-    _p.add_argument('-p', '--percent', dest='percent', default=None, type=int, help='target type, background type')
+    _p.add_argument('-p', '--percent', dest='percent', default=None, type=int, \
+                    help='target type, background type')
     _p.add_argument('--solid-bg', dest='solid_bg', action='store_true')
     _p.add_argument('--fill-nodata', dest='fill_nodata', type=float)
     _p.add_argument('-v', '--valid-vals', dest='valid_vals', type=int, nargs='*')
@@ -373,6 +374,7 @@ def usage():
     _p.add_argument('--values-mapping', dest='values_mapping')
     _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
             help='remove the tiles previously generated for the layer')
+    _p.add_argument('--overwrite-pg-layer', dest='overwrite_pg_layer', type='bool')
     
     _p.add_argument('--hillshade', dest='hillshade', type='bool')
     
