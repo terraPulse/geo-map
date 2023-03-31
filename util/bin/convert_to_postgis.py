@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 '''
 File: convert_to_postgis.py
 Author: Min Feng
@@ -33,7 +35,7 @@ def migrate(d_inp, tag_inp, d_out, tag_out):
     _f_ccc = os.path.join(_d_out, 'setting.ini')
     
     if not config.getboolean('conf', 'overwrite') and file_mag.get(_f_ccc).exists():
-        logging.warning('skip existing layer %s(%s)' % (d_inp, tag_inp))
+        logging.warning('skip existed layer %s (%s)' % (d_inp, tag_inp))
         return False
     
     _b_cvt = d_inp == d_out and tag_inp == tag_out
@@ -55,12 +57,8 @@ def migrate(d_inp, tag_inp, d_out, tag_out):
     _inp = _cfg.file
     logging.info('input data file %s' % _cfg.file)
     
-    if _inp.startswith('PG:'):
-        logging.warning('the input file is already in PG')
-        return False
-    
-    if not _inp.lower().endswith('.shp'):
-        logging.warning('the input file (%s) is not a shapefile' % _inp)
+    if not (_inp.startswith('PG:') or _inp.lower().endswith('.shp')):
+        logging.warning('the input file (%s) needs to be a shapefile or PG' % _inp)
         return False
         
     from geo_map_util import map_tile_util
@@ -71,6 +69,10 @@ def migrate(d_inp, tag_inp, d_out, tag_out):
         
     _cfg.file = _con
     _cfg.origin = _inp
+    
+    _old = _cfg.get('origin', '')
+    if _old:
+        _cfg.origin2 = _old
     
     logging.info('output setting file %s' % _f_ccc)
     _cfg.save(_f_ccc)

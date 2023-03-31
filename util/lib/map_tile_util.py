@@ -31,16 +31,17 @@ def shp_to_psql(f_shp, tag=None, overwrite=False):
     from gio import config
     from gio import file_mag
     
-    if not (f_shp.lower().endswith('.shp') or f_shp.startwith('PG:')):
+    if not (f_shp.lower().endswith('.shp') or f_shp.startswith('PG:')):
         logging.warning('only supports shapefile or PG input')
         return None
         
-    _g = lambda x: config.get('pgdb', x)
+    _g = lambda x, v=None: config.get('pgdb', x, v)
     if not _g('host'):
         raise Exception('no PostGIS connection provided')
         
+    _shp = f_shp
     _con = 'PG:host=%s port=%s user=%s dbname=%s password=%s' % (\
-                _g('host'), _g('port'), _g('user'), _g('dbname'), _g('password'))
+                _g('host'), _g('port', 5432), _g('user'), _g('dbname'), _g('password'))
     
     import re
     _tag = 'map_%s' % (re.sub('[^\w\d]', '_', tag.lower()))
