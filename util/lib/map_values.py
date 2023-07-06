@@ -159,6 +159,9 @@ def parse_tag(t, tag, met):
         with open(file_mag.get(met.get('values_mapping')).get()) as _fi:
             return values_mapping(yaml.safe_load(_fi))
     
+    if _m := met.get('tag'):
+        return _m
+
     if tag:
         return tag.lower().strip()
         
