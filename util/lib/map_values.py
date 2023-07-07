@@ -160,6 +160,7 @@ def parse_tag(t, tag, met):
             return values_mapping(yaml.safe_load(_fi))
     
     if _m := met.get('tag'):
+        logging.info('layer tag: %s' % _m)
         return _m
 
     if tag:
