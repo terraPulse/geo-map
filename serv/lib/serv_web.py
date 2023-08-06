@@ -11,12 +11,27 @@ class web(serv_base.service_base):
     def __init__(self, request):
         serv_base.service_base.__init__(self, request)
 
-    def _add_maps(self, f, fzip):
+    def _add_maps_list(self, f_map, host, fzip):
+        from gio import file_mag
+
+        _f_map = file_mag.get(os.path.join(f_map, 'list.txt'))
+        if not _f_map.exists():
+            return []
+
+        _fs = []
+        for _l in sorted(_f_map.read().decode('utf-8').strip().splitlines()):
+            _ll = '\tcreate_layer(\'%s/map/%s\', \'%s\', false, map);' % (host, _l, _l)
+            _fs.append(_ll)
+            
+        return _fs
+
+    def _add_maps_dir(self, d_map, host, fzip):
         from gio import config
         from gio import obj
         import os
 
-        _d_map = config.get('general', 'map_path')
+        _d_map = d_map
+        
         _fs = []
         for _d in sorted(os.listdir(_d_map)):
             _f = os.path.join(_d_map, _d, 'setting.ini')
@@ -28,21 +43,53 @@ class web(serv_base.service_base):
                     continue
 
                 _tit = _obj.get('title', _d)
-                _lin = '\tmap.addLayer(create_layer(\'/map/%s\', \'%s\'));' % (_d, _tit)
+                _lin = '\tmap.addLayer(create_layer(\'%s/map/%s\', \'%s\'));' % (host, _d, _tit)
                 _fs.append(_lin)
 
                 logging.debug('add layer %s: %s' % (_tit, _d))
+                
+        return _fs
+
+    def _add_maps(self, f, fzip):
+        from gio import file_mag
+        from gio import config
+        from gio import obj
+        import os
+
+        _d_map = config.get('general', 'map_path')
+        _host = config.get('general', 'map_host', '')
+        
+        logging.info('map path: %s (%s)' % (_d_map, os.path.isdir(_d_map)))
+        
+        _fs = self._add_maps_dirs(_d_map, _host, fzip) if os.path.isdir(_d_map) \
+                else self._add_maps_list(_d_map, _host, fzip)
 
         if len(_fs) == 0:
             return f
         else:
             _f = fzip.generate_file('', '.js')
             _p = '// **map**'
-            with open(_f, 'w') as _fo, open(f, 'r') as _fi:
-                _fo.write(_fi.read().replace(_p, '\n'.join(_fs + ['\t' + _p])))
-
+            with open(_f, 'w') as _fo:
+                _t = file_mag.get(f).read()
+                if not _t:
+                    return None
+                _fo.write(_t.decode('utf-8').replace(_p, '\n'.join(_fs + ['\t' + _p])))
             return _f
 
+    def _set_host(self, f, fzip):
+        from gio import file_mag
+
+        _host = config.get('general', 'map_host', '')
+        
+        _f = fzip.generate_file('', '.js')
+        _p = '{{host}}'
+        with open(_f, 'w') as _fo:
+            _t = file_mag.get(f).read()
+            if not _t:
+                return None
+            _fo.write(_t.decode('utf-8').replace(_p, _sev))
+        return _f
+    
     def task(self, path):
         import os
         import re
@@ -65,6 +112,10 @@ class web(serv_base.service_base):
         if re.search('js/map.*\.js', _f_res):
             with file_unzip.file_unzip() as _zip:
                 return self.output_file(self._add_maps(_f_res, _zip))
+                
+        if re.search('js/map_controls\.js', _f_res):
+            with file_unzip.file_unzip() as _zip:
+                return self.output_file(self._set_host(_f_res, _zip))
 
         return self.output_file(_f_res)
 
