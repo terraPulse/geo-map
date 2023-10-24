@@ -17,8 +17,7 @@ def _list_maps_local(d, ds, level):
     if not os.path.exists(d):
         return
 
-    print('checking %s' % os.path.join(d, _d))
-    
+    # print('checking %s' % os.path.join(d, _d))
     for _d in os.listdir(d):
         
         if not os.path.isdir(os.path.join(d, _d)):
@@ -109,7 +108,8 @@ def main(opts):
     if _d_out.startswith('s3://'):
         _list_maps_s3(file_mag.get(_d_out if _d_out.endswith('/') else _d_out + '/'), _ms, 0)
     else:
-        _list_maps_local(file_mag.get(_d_out), _ms, 0)
+        # _list_maps_local(file_mag.get(_d_out), _ms, 0)
+        _list_maps_local(_d_out, _ms, 0)
         
     _ms = [_format_dir(_m, _d_out) for _m in sorted(_ms)]
     
