@@ -452,7 +452,9 @@ class band:
             _bnd_inp = self._load_block(bnd_out.scale(zoom))
             if _bnd_inp is None:
                 return None
-                
+            
+            import numpy as np
+            from gio import geo_raster as ge
             _bnd = agg_band.dominated(_bnd_inp, bnd_out, _wets)
             _bnd.color_table = _bnd_inp.color_table
             
