@@ -124,7 +124,7 @@ def create_tasks(met, opts, levels, fzip):
     _tiles = tiles()
 
     _ps = []
-    for _lev in range(levels[0], levels[1]+1):
+    for _lev in levels:
         print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
         for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
             _ps.append((_lev, _num, _col, _row))
@@ -133,24 +133,6 @@ def create_tasks(met, opts, levels, fzip):
     print('found %s tasks' % len(_ps))
     
     return _ps
-
-    # print 'write map.html'
-    # from gio import geo_raster as ge
-    # _ext_geo = _ext.to_polygon().segment_ratio(30).project_to(ge.proj_from_epsg()).extent()
-
-    # _f_out = os.path.join(d_out, 'map.html')
-    # with open(config.cfg.get('conf', 'openlayers_temp'), 'r') as _fi, open(_f_out, 'w') as _fo:
-    #     _fo.write(_fi.read() % {
-    #             'title': os.path.basename(f_inp),
-    #             'xmin': _ext_geo.minx, 'xmax': _ext_geo.maxx,
-    #             'ymin': _ext_geo.miny, 'ymax': _ext_geo.maxy,
-    #             'zmin': levels[0], 'zmax': levels[1]
-    #             })
-
-    # print('write to', os.path.join(d_ooo, 'tasks.txt'))
-    # with open(os.path.join(d_out, 'tasks.txt'), 'wb') as _fo:
-    #     import pickle
-    #     pickle.dump(_ps, _fo)
 
 def make_tile(lev, num, col, row, params, opts, inp):
     _tag = opts.tag
@@ -165,25 +147,32 @@ def make_tile(lev, num, col, row, params, opts, inp):
     out = config.get('conf', 'output') or inp
     clr = os.path.join(inp, 'color.txt')
     
-    pec, vals, solid_bg, msk = params.get('percent'), params.get('valid_vals'), params.get('solid_bg'), params.get('mask')
-    if opts.level_min is not None:
-        if lev < opts.level_min:
-            return
-
-    if opts.level_max is not None:
-        if lev > opts.level_max:
-            return
-        
-    # if not (lev == 7 and col == 11 and row == 97):
-    #     return
-
-    # print(params.file, lev, col, row, pec, vals, solid_bg, clr, msk, out, \
-    #         params.get('agg'))
-    # return
+    pec, vals, solid_bg, msk = params.get('percent'), params.get('valid_vals'), \
+                params.get('solid_bg'), params.get('mask')
     
     from geo_map_util import map_tile
     map_tile.make_tile(params.get('file'), lev, col, row, pec, vals, solid_bg, clr, msk, out, \
             agg=params.get('agg'), opts=params)
+    
+def parse_levels(lvls):
+    import re
+    
+    _ls = []
+    for _l in lvls:
+        _m = re.match('^[0-9]+$', _l)
+        if _m:
+            _ls.append(int(_l))
+            continue
+            
+        _m = re.match('^([0-9]+)\-([0-9]+)$', _l)
+        if _m:
+            for _z in range(int(_m.group(1)), int(_m.group(2)) + 1):
+                _ls.append(_z)
+            continue
+                
+        raise Exception('failed to parse {}'.format(_l))
+        
+    return _ls
 
 def main(opts):
     import os
@@ -197,13 +186,6 @@ def main(opts):
     
     _out = os.path.join(config.get('conf', 'input'), opts.tag)
 
-    # with open(file_mag.get(os.path.join(_out, 'tasks.txt')).get(), 'rb') as _fi:
-    #     _ps = pickle.load(_fi)
-
-    # from gio import multi_task
-    # _tt = multi_task.load(_ps, opts)
-    # print('%s tasks' % len(_tt))
-    
     _f_ini = opts.setting or os.path.join(_out, 'setting.ini')
     
     if not file_mag.get(_f_ini).exists():
@@ -213,12 +195,14 @@ def main(opts):
     from gio import obj
     _met = obj.load(file_mag.get(_f_ini).get())
     
-    _lev = opts.levels if opts.levels else [_met.get('min_static_level', 3), _met.get('min_dynamic_level', 9)]
-    opts.levels = _lev
+    _lev = parse_levels(opts.levels) if opts.levels else \
+            range[_met.get('min_static_level', 3), _met.get('min_dynamic_level', 9)+1]
     
-    opts.level_min = min(opts.levels)
-    opts.level_max = max(opts.levels)
-    print('levels: %s - %s' % (opts.level_min, opts.level_max))
+    opts.levels = _lev
+    print('levels: %s' % opts.levels)
+    
+#     opts.level_min = min(opts.levels)
+#     opts.level_max = max(opts.levels)
     
     if opts.clean_tiles:
         if _met.version < 2.0:
@@ -235,11 +219,6 @@ def main(opts):
     with file_unzip.zip() as _zip:
         _tt = create_tasks(_met, opts, opts.levels, _zip)
         
-    # _d_out = config.get('conf', 'output')
-    # if _d_out:
-    #     logging.info('updating output folder %s' % _d_out)
-    #     _tt = [_t[:-1] + (_d_out, ) for _t in _tt]
-
     from gio import multi_task
     multi_task.run(make_tile, multi_task.load(_tt, opts), opts, (_met, opts, _out))
     print()
@@ -257,7 +236,7 @@ def usage():
             help='remove the tiles previously generated for the layer')
 
     _p.add_argument('-r', '--region', dest='region')
-    _p.add_argument('-l', '--levels', dest='levels', nargs=2, type=int)
+    _p.add_argument('-l', '--levels', dest='levels', nargs='*')
 
     return _p
 
