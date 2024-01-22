@@ -201,8 +201,9 @@ class map_tile:
         return _f
         
     def _read_file(self, f):
-        with open(file_mag.get(f).get(), 'rb') as _fi:
-            return _fi.read()
+        return file_mag.get(f).read()
+        # with open(file_mag.get(f).get(), 'rb') as _fi:
+        #     return _fi.read()
             
     def get(self, tag, lev, col, row):
         _met = self._load_setting(tag, lev, col, row)
@@ -215,24 +216,28 @@ class map_tile:
         else:
             _out = os.path.join(_d_web, _met.tag, '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
             
+        _out_file = file_mag.get(_out)
+        # logging.info('checking %s' % _out)
+        
+        if _out_file.exists():
+            # logging.info('skip generation of the map tile (%s)' % _out) 
+            return _out_file.read() #self._read_file(_out)
+        
         # logging.debug('request tile %s' % _out)
-
         with file_unzip.zip() as _zip:
             _cache = config.get('conf', 'cache', None)
             if not _cache:
                 _tmp = _zip.generate_file()
                 config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
 
-            if file_mag.get(_out).exists():
-                return self._read_file(_out)
-                
             # logging.debug('generating map tile (%s)' % _out)
             self._dmap_mag_single(_met)
 
             # logging.debug('get tile %s' % _out)
-            _out_file = file_mag.get(_out)
             _is_nodata = not _out_file.exists()
             
+            # logging.info('existance of the output %s' % _is_nodata)
+            # logging.info('keep nodata %s' % config.getboolean('conf', 'keep_nodata_tiles', True))
             if not _is_nodata:
                 _ooo = self._post_proc(_out, _met)
                 if _out != _ooo:

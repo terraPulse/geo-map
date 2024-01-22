@@ -181,7 +181,7 @@ def main(opts):
     from gio import file_mag
     
     config.set('conf', 'skip_low_levels', False)
-    config.set('conf', 'keep_nodata_tiles', False)
+    config.set('conf', 'keep_nodata_tiles', True)
     config.set('general', 'map_path', config.get('conf', 'input'))
     
     _out = os.path.join(config.get('conf', 'input'), opts.tag)
