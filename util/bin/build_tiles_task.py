@@ -181,7 +181,7 @@ def main(opts):
     from gio import file_mag
     
     config.set('conf', 'skip_low_levels', False)
-    config.set('conf', 'keep_nodata_tiles', True)
+    # config.set('conf', 'keep_nodata_tiles', True)
     config.set('general', 'map_path', config.get('conf', 'input'))
     
     _out = os.path.join(config.get('conf', 'input'), opts.tag)
@@ -232,6 +232,8 @@ def usage():
     _p.add_argument('-s', '--setting', dest='setting')
     _p.add_argument('-c', '--cache', dest='cache')
     
+    _p.add_argument('-k', '--keep-nodata-tiles', dest='keep_nodata_tiles', type='bool', default=True,
+                   help='keep the nodata map tiles')
     _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
             help='remove the tiles previously generated for the layer')
 
