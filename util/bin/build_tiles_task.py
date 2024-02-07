@@ -185,7 +185,6 @@ def main(opts):
     config.set('general', 'map_path', config.get('conf', 'input'))
     
     _out = os.path.join(config.get('conf', 'input'), opts.tag)
-
     _f_ini = opts.setting or os.path.join(_out, 'setting.ini')
     
     if not file_mag.get(_f_ini).exists():
@@ -212,8 +211,7 @@ def main(opts):
             print('cleaning tiles')
             
             from gio import file_mag
-            _d_out = _out if _out else _tt
-            file_mag.get(os.path.join(_d_out, 'tiles')).remove()
+            file_mag.get(os.path.join(_out, 'tiles')).remove()
             
     from gio import file_unzip
     with file_unzip.zip() as _zip:

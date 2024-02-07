@@ -160,6 +160,26 @@ def to_pg(f, tag=None, overwrite=True):
     logging.info('converted %s to PostGIS table (%s)' % (f, _c))
     return _c
 
+def parse_levels(lvls):
+    import re
+    
+    _ls = []
+    for _l in lvls:
+        _m = re.match('^[0-9]+$', _l)
+        if _m:
+            _ls.append(int(_l))
+            continue
+            
+        _m = re.match('^([0-9]+)\-([0-9]+)$', _l)
+        if _m:
+            for _z in range(int(_m.group(1)), int(_m.group(2)) + 1):
+                _ls.append(_z)
+            continue
+                
+        raise Exception('failed to parse {}'.format(_l))
+        
+    return _ls
+
 def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d_ooo, fzip, opts):
     import os
     from gio import file_mag
@@ -286,6 +306,11 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
         _obj.burn_transparency.input = opts.burn_transparency_input
         _obj.burn_transparency.level = opts.burn_transparency_level
 
+    if opts.interpo_levels:
+        _lvs = parse_levels(opts.interpo_levels)
+        print('enabling interpolation from levels: %s' % _lvs)
+        _obj.processed_levels = _lvs
+        
     _obj.save(os.path.join(d_out, 'setting.ini'))
     
 def main(opts):
@@ -390,6 +415,11 @@ def usage():
         
     _p.add_argument('--update-list', dest='update_list', type='bool', default=True, \
         help='run update_map_list.py after the map task is defined')
+    
+    _p.add_argument('--postgis', '--convert-to-postgis', dest='convert_to_postgis', type='bool', \
+        default=False, help='convert the data list to postgis')
+
+    _p.add_argument('--interpo-levels', dest='interpo_levels', nargs='+', help='levels for map tile interpolation')
 
     return _p
 
