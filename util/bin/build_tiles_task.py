@@ -195,7 +195,7 @@ def main(opts):
     _met = obj.load(file_mag.get(_f_ini).get())
     
     _lev = parse_levels(opts.levels) if opts.levels else \
-            range[_met.get('min_static_level', 3), _met.get('min_dynamic_level', 9)+1]
+            list(range(_met.get('min_static_level', 3), _met.get('min_dynamic_level', 9)+1))
     
     opts.levels = _lev
     print('levels: %s' % opts.levels)

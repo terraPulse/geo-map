@@ -1,4 +1,5 @@
-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 def shp_to_psql(f_shp, con, tag):
     from gio import config
