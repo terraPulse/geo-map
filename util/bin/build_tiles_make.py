@@ -416,8 +416,8 @@ def usage():
     _p.add_argument('--update-list', dest='update_list', type='bool', default=True, \
         help='run update_map_list.py after the map task is defined')
     
-    _p.add_argument('--postgis', '--convert-to-postgis', dest='convert_to_postgis', type='bool', \
-        default=False, help='convert the data list to postgis')
+    _p.add_argument('--postgis', '--convert-to-postgis', dest='convert_to_postgis', type='bool', 
+                    help='convert the data list to postgis')
 
     _p.add_argument('--interpo-levels', dest='interpo_levels', nargs='+', help='levels for map tile interpolation')
 
