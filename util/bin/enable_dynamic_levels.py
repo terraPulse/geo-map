@@ -57,6 +57,16 @@ def main(opts):
     logging.info(f'repository: {_rep}')
     
     map_tile_levels(_rep, opts.tag, parse_levels(opts.levels))
+    if config.getboolean('conf', 'execute'):
+        from gio import run_commands
+        
+        print('generate map tiles')
+        _cmd = 'build_tiles_task.py -t %s ' % (opts.tag, )
+        # _agg = ' -a %s ' % opts.agg if opts.agg else ''
+        _tsk = '-in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
+                opts.instance_num, opts.instance_pos, opts.task_num, \
+                        '-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
+        run_commands.run(_cmd + _tsk)
 
 def usage():
     _p = environ_mag.usage(True)
@@ -64,6 +74,7 @@ def usage():
     _p.add_argument('-i', '--input', dest='input')
     _p.add_argument('-t', '--tag', dest='tag', required=True)
     _p.add_argument('-l', '--levels', dest='levels', nargs='*', required=True)
+    _p.add_argument('-e', '--execute', dest='execute', type='bool')
 
     return _p
 

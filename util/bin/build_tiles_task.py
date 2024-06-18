@@ -174,6 +174,11 @@ def parse_levels(lvls):
         
     return _ls
 
+def load_levels(met):
+    if met.get('processed_levels') is not None:
+        return met.get('processed_levels')
+    return list(range(met.get('min_static_level', 3), met.get('min_dynamic_level', 9)+1))
+
 def main(opts):
     import os
     import logging
@@ -194,9 +199,7 @@ def main(opts):
     from gio import obj
     _met = obj.load(file_mag.get(_f_ini).get())
     
-    _lev = parse_levels(opts.levels) if opts.levels else \
-            list(range(_met.get('min_static_level', 3), _met.get('min_dynamic_level', 9)+1))
-    
+    _lev = parse_levels(opts.levels) if opts.levels else load_levels(_met)    
     opts.levels = _lev
     print('levels: %s' % opts.levels)
     
