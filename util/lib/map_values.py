@@ -151,14 +151,29 @@ def map_value(tag, v):
     return v
     
 def parse_tag(t, tag, met):
-    if met.get('values_mapping'):
-        from gio import file_mag
-        import yaml
-        
-        logging.info('values_mapping: %s' % met.get('values_mapping'))
-        with open(file_mag.get(met.get('values_mapping')).get()) as _fi:
-            return values_mapping(yaml.safe_load(_fi))
+    _f_map = met.get('values_mapping')
     
+    if _f_map:
+        from gio import file_mag
+        
+        logging.info('values_mapping: %s' % _f_map)
+        
+        _txt = file_mag.get(_f_map).read()
+        _obj = None
+        
+        if _f_map.endswith('.json'):
+            import json
+            _obj = {int(_k): _v for _k, _v in json.loads(_txt).items()}
+            
+        elif _f_map.endswith('.yml') or _f_map.endswith('.yaml'):
+            import yaml
+            _obj = yaml.safe_load(_txt)
+            
+        if _obj is not None:
+            return values_mapping(_obj)
+        
+        raise Exception('failed to parse %s' % _f_map)
+        
     _m = met.get('tag')
     if _m:
         logging.info('layer tag: %s' % _m)
@@ -184,6 +199,9 @@ def parse_tag(t, tag, met):
     if 'gain_year' in _t:
         return 'forest_gain'
         
+    if 'esta_year' in _t:
+        return 'forest_esta'
+
     if 'forest_esta' in _t:
         return 'forest_esta'
         
