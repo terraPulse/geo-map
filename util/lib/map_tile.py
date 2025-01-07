@@ -10,47 +10,155 @@ Description: provide functions for generating map tiles
 import math
 import logging
 
-class tiles:
+class tile:
 
-    def __init__(self):
+    def __init__(self, level, col, row, merge=1):
+        self.level = level
+        self.col = col
+        self.row = row
+        self.merge = merge
+        self.tiles = tile_mag(merge)
+
+    def size(self, level):
+        '''Size of the tile in mapping unit'''
+        return self.merge * self.tiles.tile_size(self.level)
+
+    def cell(self, level):
+        '''Pixel cell size in mapping unit'''
+        return self.tiles.cell(self.level)
+
+    def raster(self):
+        _r = self.tiles.tile_size(self.level)
+        _c = _r / self.tiles.s
+
+        _x = -self.tiles.p + (self.col * _r)
+        _y = -self.tiles.p + (self.row * _r)
+
+        _geo = [_x, _c, 0, _y + _r * self.merge, 0, -_c]
+
+        from gio import geo_raster as ge
+        return ge.geo_raster_info(_geo, \
+                                  self.tiles.s * self.merge, \
+                                  self.tiles.s * self.merge, \
+                                  self.tiles.prj)
+
+    def extent(self):
+        _r = self.tiles.tile_size(self.level)
+        _c = _r / self.tiles.s
+
+        _x = -self.tiles.p + (self.col * _r)
+        _y = -self.tiles.p + (self.row * _r)
+
+        from gio import geo_base as gb
+        return gb.geo_extent(_x, _y, _x + _r * self.merge, \
+                             _y + _r * self.merge, self.tiles.prj)
+
+    def file(self, d_out, version=2.0):
+        import os
+        from gio import file_mag
+        
+        if version < 2.0:
+            _d = os.path.join(d_out, str(self.level), str(self.col))
+        else:
+            _d = os.path.join(d_out, 'tiles', str(self.level), str(self.col))
+            
+        _f = os.path.join(_d, '%s.png' % self.row)
+        return file_mag.get(_f)
+
+class tile_mag:
+
+    def __init__(self, merge=1):
+        from gio import config
+        
         self.b = 6378137.0
+        
         self.s = 256
+        self.merge = merge
+        if self.merge < 1:
+            raise Exception('merging factor too small (%s)' % self.merge)
+            
         self.p = self.b * math.pi
 
         from gio import geo_base as gb
         self.prj = gb.proj_from_epsg(3857)
 
     def list(self, level, ext=None):
-        from gio import geo_base as gb
-
-        _r = (2 * self.p) / (2 ** level)
+        _r = self.tile_size(level)
 
         _rows = 2 ** level
         _cols = 2 ** level
-
+        
         _num = -1
-        for _row in range(_rows):
-            for _col in range(_cols):
+        for _row in range(0, _rows, self.merge):
+            for _col in range(0, _cols, self.merge):
                 _num += 1
 
-                _x = -self.p + (_col * _r)
-                _y = -self.p + (_row * _r)
+                _t = tile(level, _col, _row, self.merge)
+                _e = _t.extent()
 
-                _ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
-                if ext == None or _ext.is_intersect(ext):
+                if ext is None or _e.is_intersect(ext):
                     yield level, _num, _col, _row
 
-    def extent(self, level, col, row):
-        _r = (2 * self.p) / (2 ** level)
-        _c = _r / self.s
+    def tile_size(self, level):
+        return (2 * self.p) / (2 ** level)
 
-        _x = -self.p + (col * _r)
-        _y = -self.p + (row * _r)
+    def cell(self, level):
+        return self.tile_size(level) / self.s
+        
+# class tiles:
 
-        _geo = [_x, _c, 0, _y + _r, 0, -_c]
+#     def __init__(self, merge=1):
+#         from gio import config
+        
+#         self.b = 6378137.0
+        
+#         self.s = 256
+#         self.merge = merge
+#         if self.merge < 1:
+#             raise Exception('merging factor too small (%s)' % self.merge)
+            
+#         self.p = self.b * math.pi
 
-        from gio import geo_raster as ge
-        return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
+#         from gio import geo_base as gb
+#         self.prj = gb.proj_from_epsg(3857)
+
+#     def list(self, level, ext=None):
+#         from gio import geo_base as gb
+
+#         _r = self.tile_size(level)
+
+#         _rows = 2 ** level
+#         _cols = 2 ** level
+
+#         _num = -1
+#         for _row in range(0, _rows, self.merge):
+#             for _col in range(0, _cols, self.merge):
+#                 _num += 1
+
+#                 _x = -self.p + (_col * _r)
+#                 _y = -self.p + (_row * _r)
+
+#                 _ext = gb.geo_extent(_x, _y, _x + _r * self.merge, _y + _r * self.merge, self.prj)
+#                 if ext == None or _ext.is_intersect(ext):
+#                     yield level, _num, _col, _row
+
+#     def tile_size(self, level):
+#         return (2 * self.p) / (2 ** level)
+
+#     def cell(self, level):
+#         return self.tile_size(level) / self.s
+
+#     def extent(self, level, col, row):
+#         _r = self.tile_size(level)
+#         _c = _r / self.s
+
+#         _x = -self.p + (col * _r)
+#         _y = -self.p + (row * _r)
+
+#         _geo = [_x, _c, 0, _y + _r * self.merge, 0, -_c]
+
+#         from gio import geo_raster as ge
+#         return ge.geo_raster_info(_geo, self.s * self.merge, self.s * self.merge, self.prj)
 
 def _mask_grid(bnd, f, fzip):
     from gio import rasterize_band as rb
@@ -77,21 +185,14 @@ def _mask_grid(bnd, f, fzip):
     raise Exception('failed to recognize the image type')
 
 def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
-    # from osgeo import gdal
-    # gdal.UseExceptions()
     import os
     from gio import file_mag
 
-    if opts.get('version', 1.0) < 2.0:
-        _d = os.path.join(d_out, str(lev), str(col))
-    else:
-        _d = os.path.join(d_out, 'tiles', str(lev), str(col))
-        
-    _f = os.path.join(_d, '%s.png' % row)
-    # logging.debug('generating tile at %s' % _f)
+    _tile = tile(lev, col, row, opts.getint('tile_merge', 1))
+    _out = _tile.file(d_out, version=opts.get('version', 1.0))
     
-    if file_mag.get(_f).exists():
-        logging.debug('skip %s' % _f)
+    if _out.exists():
+        logging.debug('skip %s' % _out)
         return
 
     from gio import file_unzip
@@ -102,24 +203,22 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
             _tmp = _zip.generate_file()
             config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
 
-        _ext = tiles().extent(lev, col, row)
-
-        _finp = file_mag.get(f).get()
-        # logging.debug('generate tile %s' % _f)
-        
         _d_tmp = _zip.generate_file()
         os.makedirs(_d_tmp)
-        _f_tmp = os.path.join(_d_tmp, os.path.basename(_f))
+        _f_tmp = os.path.join(_d_tmp, os.path.basename(str(_out)))
+        
+        _ext = _tile.raster()
+        _inp = f # file_mag.get(f).get()
         
         if percent != None:
-            band(_finp, lev, _ext, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
+            band(_inp, lev, _ext, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
                     vals, f_clr, _f_tmp, agg=agg, \
                     mag=opts.get('mag', None), opts=opts)
         else:
-            band(_finp, lev, _ext, f_msk, solid_bg, opts, _zip).make(_ext, \
+            band(_inp, lev, _ext, f_msk, solid_bg, opts, _zip).make(_ext, \
                     f_clr, _f_tmp, agg=agg, opts=opts)
                     
-        file_unzip.compress_folder(_d_tmp, os.path.dirname(_f), [])
+        file_unzip.compress_folder(_d_tmp, os.path.dirname(str(_out)), [])
 
 class color_table:
 

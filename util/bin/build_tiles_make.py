@@ -283,7 +283,11 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
     if _min_dynamic_level is not None:
         print('min_dynamic_level: ', _min_dynamic_level)
         _obj.min_dynamic_level = _min_dynamic_level
-        
+
+    if opts.tile_merge is not None:
+        print('tile_merge:', opts.tile_merge)
+        _obj.tile_merge = opts.tile_merge
+
     print('min_static_level: ', levels[0])
     _obj.min_static_level = levels[0]
 
@@ -420,6 +424,7 @@ def usage():
                     help='convert the data list to postgis')
 
     _p.add_argument('--interpo-levels', dest='interpo_levels', nargs='+', help='levels for map tile interpolation')
+    _p.add_argument('--tile-merge', dest='tile_merge', type=int, default=1)
 
     return _p
 

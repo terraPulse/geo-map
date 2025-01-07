@@ -204,52 +204,60 @@ class map_tile:
         return file_mag.get(f).read()
         # with open(file_mag.get(f).get(), 'rb') as _fi:
         #     return _fi.read()
-            
-    def get(self, tag, lev, col, row):
+
+    def _nodata_image(self, size):
+        import PIL.Image
+        import io
+
+        _im = PIL.Image.new(mode = "RGBA", size = (size, size),
+                           color = (0, 0, 0, 0))
+ 
+        _io = io.BytesIO()
+        _im.save(_io, format='PNG')
+        return _io.getvalue()
+
+    def get_image(self, tag, lev, col, row):
+        from geo_map_util import map_tile
+        
         _met = self._load_setting(tag, lev, col, row)
-        
+        _tile = map_tile.tile(lev, col, row, _met.get('tile_merge', 1))
         _d_web = config.get_at('general', 'map_path')
-        # logging.debug('map path: %s' % _d_web)
-    
-        if _met.get('version', 1.0) >= 2.0:
-            _out = os.path.join(_d_web, _met.tag, 'tiles', '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
-        else:
-            _out = os.path.join(_d_web, _met.tag, '%s' % _met.lev, '%s' % _met.col, '%s.png' % _met.row)
-            
-        _out_file = file_mag.get(_out)
-        # logging.info('checking %s' % _out)
-        
+
+        _out_file = _tile.file(os.path.join(_d_web, _met.tag), _met.get('version', 1.0))
         if _out_file.exists():
-            # logging.info('skip generation of the map tile (%s)' % _out) 
-            return _out_file.read() #self._read_file(_out)
-        
-        # logging.debug('request tile %s' % _out)
+            return _out_file.read()
+            
         with file_unzip.zip() as _zip:
             _cache = config.get('conf', 'cache', None)
             if not _cache:
                 _tmp = _zip.generate_file()
                 config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
 
-            # logging.debug('generating map tile (%s)' % _out)
             self._dmap_mag_single(_met)
-
-            # logging.debug('get tile %s' % _out)
             _is_nodata = not _out_file.exists()
             
             # logging.info('existance of the output %s' % _is_nodata)
             # logging.info('keep nodata %s' % config.getboolean('conf', 'keep_nodata_tiles', True))
-            if not _is_nodata:
-                _ooo = self._post_proc(_out, _met)
-                if _out != _ooo:
-                    _out_file.put(_ooo)
-            else:
-                _ooo = config.get('general', 'nodata_file')
+            if _is_nodata:
+                _ooo = self._nodata_image(_met.get('tile_merge', 1) * 256)
                 if config.getboolean('conf', 'keep_nodata_tiles', True):
-                    _out_file.put(file_mag.get(_ooo).get())
+                    _out_file.write(_ooo)
+                return _ooo
+
+            _out = str(_out_file)
+            _ooo = self._post_proc(_out, _met)
+            if _out != _ooo:
+                _out_file.put(_ooo)
             
             return self._read_file(_ooo)
 
         raise Exception('no module found %s' % tag)
+
+    def get(self, tag, lev, col, row):
+        _img = self.get_image(tag, lev, col, row)
+        if not _img:
+            return None
+        return _img
 
 def _burn_band(b1, b2, offset=200):
     import numpy as np

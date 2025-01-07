@@ -11,53 +11,53 @@ Description:
 
 import logging
 
-class tiles:
+# class tiles:
 
-    def __init__(self):
-        import math
-        from gio import geo_raster as ge
+#     def __init__(self):
+#         import math
+#         from gio import geo_raster as ge
 
-        self.b = 6378137.0
-        self.s = 256
-        self.p = self.b * math.pi
+#         self.b = 6378137.0
+#         self.s = 256
+#         self.p = self.b * math.pi
 
-        self.prj = ge.proj_from_epsg(3857)
+#         self.prj = ge.proj_from_epsg(3857)
 
-    def list(self, level, ext=None):
-        from gio import geo_base as gb
+#     def list(self, level, ext=None):
+#         from gio import geo_base as gb
 
-        _r = (2 * self.p) / (2 ** level)
+#         _r = (2 * self.p) / (2 ** level)
 
-        _rows = 2 ** level
-        _cols = 2 ** level
+#         _rows = 2 ** level
+#         _cols = 2 ** level
 
-        _num = -1
-        for _row in range(_rows):
-            for _col in range(_cols):
-                _num += 1
+#         _num = -1
+#         for _row in range(_rows):
+#             for _col in range(_cols):
+#                 _num += 1
 
-                _x = -self.p + (_col * _r)
-                _y = -self.p + (_row * _r)
+#                 _x = -self.p + (_col * _r)
+#                 _y = -self.p + (_row * _r)
 
-                _ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
-                if ext is None or _ext.is_intersect(ext):
-                    yield level, _num, _col, _row
+#                 _ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
+#                 if ext is None or _ext.is_intersect(ext):
+#                     yield level, _num, _col, _row
 
-    def cell(self, level):
-        _r = (2 * self.p) / (2 ** level)
-        return _r / self.s
+#     def cell(self, level):
+#         _r = (2 * self.p) / (2 ** level)
+#         return _r / self.s
 
-    def extent(self, level, col, row):
-        _r = (2 * self.p) / (2 ** level)
-        _c = _r / self.s
+#     def extent(self, level, col, row):
+#         _r = (2 * self.p) / (2 ** level)
+#         _c = _r / self.s
 
-        _x = -self.p + (col * _r)
-        _y = -self.p + (row * _r)
+#         _x = -self.p + (col * _r)
+#         _y = -self.p + (row * _r)
 
-        _geo = [_x, _c, 0, _y + _r, 0, -_c]
+#         _geo = [_x, _c, 0, _y + _r, 0, -_c]
 
-        from gio import geo_raster as ge
-        return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
+#         from gio import geo_raster as ge
+#         return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
 def load_shp(f):
     from osgeo import ogr
@@ -104,6 +104,7 @@ def create_tasks(met, opts, levels, fzip):
     import os
     from gio import file_mag
     from gio import obj
+    from geo_map_util import map_tile
     
     f_inp = met.file
     f_reg = opts.region if opts.region else met.region
@@ -121,7 +122,7 @@ def create_tasks(met, opts, levels, fzip):
     logging.info('detected extent %s' % str(_ext))
     print('detected extent', _ext)
 
-    _tiles = tiles()
+    _tiles = map_tile.tile_mag(met.get('tile_merge', 1))
 
     _ps = []
     for _lev in levels:
@@ -172,7 +173,7 @@ def parse_levels(lvls):
                 
         raise Exception('failed to parse {}'.format(_l))
         
-    return _ls
+    return sorted(list(set(_ls)))
 
 def load_levels(met):
     if met.get('processed_levels') is not None:
