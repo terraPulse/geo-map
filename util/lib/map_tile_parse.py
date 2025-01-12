@@ -20,7 +20,7 @@ class loc_image:
         self.img = img
 
 def rrow(lev, row, merge):
-    assert row < 0
+    assert row <= 0
     return (2 ** lev) + row - merge
 
 def image_to_bytes(i):
