@@ -65,6 +65,9 @@ class tile:
         _f = os.path.join(_d, '%s.png' % self.row)
         return file_mag.get(_f)
 
+    def __repr__(self):
+        return (lambda x: f'{x.level}/{x.col}/{x.row}@{x.merge}')(self)
+
 class tile_mag:
 
     def __init__(self, merge=1):

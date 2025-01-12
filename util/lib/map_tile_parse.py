@@ -13,7 +13,107 @@ import logging
 _jobs = []
 _tods = []
 
-class map_tile:
+class loc_image:
+
+    def __init__(self, loc, img):
+        self.loc = loc
+        self.img = img
+
+def rrow(lev, row, merge):
+    assert row < 0
+    return (2 ** lev) + row - merge
+
+def image_to_bytes(i):
+    import io
+    _b = io.BytesIO()
+    i.save(_b, format='PNG')
+    return _b.getvalue()
+
+class tile_r:
+
+    def __init__(self, level, col, row, merge=1):
+        self.level = level
+        self.col = col
+        self.row = row if row > 0 else rrow(level, row, merge)
+        self.merge = merge
+        
+        from geo_map_util import map_tile
+        self.tile = map_tile.tile(level, col, rrow(level, -self.row, merge), merge)
+
+    @staticmethod
+    def from_tile(tile):
+        return tile_r(tile.level, tile.col, rrow(tile.level, -tile.row, tile.merge))
+
+    def __repr__(self):
+        return (lambda x: f'{x.level}/{x.col}/{x.row}@{x.merge}')(self)
+
+class tile_merge:
+
+    def tile_union(self, t1, t2):
+        return {'x1': max(t1.col, t2.col), 
+                'y1': max(t1.row, t2.row), 
+                'x2': min(t1.col + t1.merge, t2.col + t2.merge),
+                'y2': min(t1.row + t1.merge, t2.row + t2.merge)}
+    
+    def empty_image(self, merge=1):
+        from PIL import Image
+        return Image.new('RGBA', (256 * merge, 256 * merge), (0,0,0,0))
+    
+    def make_box(self, bb, t):
+        _sx = t.col
+        _sy = t.row
+        
+        _bx = (bb['x1'] - _sx, bb['y1'] - _sy, bb['x2'] - _sx, bb['y2'] - _sy)
+        return [_b * 256 for _b in _bx]
+    
+    def read_tile(self, tile_src, tile_tar, met, d_inp, tag):
+        _bb = self.tile_union(tile_src, tile_tar)
+        
+        if _bb['x2'] <= _bb['x1'] or _bb['y2'] <= _bb['y1']:
+            return None
+    
+        _sx = _bb['x1'] - tile_tar.col
+        _sy = _bb['y1'] - tile_tar.row
+        
+        _da = map_tile_task().read(met, d_inp, tag, tile_src.level, 
+                                   tile_src.tile.col, tile_src.tile.row, tile_src.merge)
+
+        from PIL import Image
+        import io
+
+        _ii = Image.open(io.BytesIO(_da))
+        return loc_image((_sx * 256, _sy * 256), _ii.crop(self.make_box(_bb, tile_src)))
+
+    def c_col(self, d, merge):
+        return int((d // merge) * merge)
+    
+    def c_row(self, d, merge, level):
+        import math
+        
+        _r = rrow(level, -d, merge)
+        _v = int(math.ceil(_r / merge) * merge)
+    
+        return rrow(level, -_v, merge)
+
+    def read(self, t, merge, met, d_inp, tag):
+        _img = self.empty_image(t.merge)
+
+        for _col in range(t.col, t.col + t.merge, merge):
+            for _row in range(t.row, t.row + t.merge, merge):
+                _z = tile_r(t.level, \
+                                   self.c_col(_col, merge), \
+                                   self.c_row(_row, merge, t.level), \
+                                   merge)
+
+                _i = self.read_tile(_z, t, met, d_inp, tag)
+                if not _i:
+                    continue
+    
+                _img.paste(_i.img, _i.loc)
+                
+        return image_to_bytes(_img)
+
+class map_tile_task:
 
     def __init__(self):
         from gio import config
@@ -67,28 +167,6 @@ class map_tile:
         finally:
             pass
         
-    def _load_setting(self, tag, lev, col, row):
-        import os
-        from gio import obj
-        from gio import config
-        from gio import file_mag
-        from gio import obj
-
-        _out = os.path.join(config.get('general', 'map_path'), tag)
-        
-        _f_ini = file_mag.get(os.path.join(_out, 'setting.ini')).get()
-        if _f_ini:
-            _met = obj.load(_f_ini)
-        else:
-            _met = obj.obj()
-
-        _met.lev = lev
-        _met.row = row
-        _met.col = col
-        _met.tag = tag
-
-        return _met
-
     def _dmap_single(self, met):
         from gio import config
         import os
@@ -150,20 +228,20 @@ class map_tile:
 
         return _ps
         
-    def _burn(self, f, met):
+    def _burn(self, f, met, merge):
         import numpy as np
         import io
         from PIL import Image
         
         _load_img = lambda x: np.array(Image.open(x))
         
-        _img = _load_img(f)
+        _img = _load_img(io.BytesIO(f.read()))
         if 'burn_band' in met:
             _opts = met.get('burn_band', {})
             _mlev = _opts.getint('level', 1)
             if met.lev >= _mlev:
                 _ftag = _opts.get('input')
-                _finp = map_tile().get(_ftag, met.lev, met.col, met.row)
+                _finp = map_tile_util().get(_ftag, met.lev, met.col, met.row, merge)
                 if _finp:
                     _offs = _opts.get('offset', 200)
                     logging.debug('burn band %s, %s' % (_ftag, _offs))
@@ -174,31 +252,23 @@ class map_tile:
             _mlev = _opts.getint('level', 1)
             if met.lev >= _mlev:
                 _ftag = _opts.get('input')
-                _finp = map_tile().get(_ftag, met.lev, met.col, met.row)
+                _finp = map_tile_util().get(_ftag, met.lev, met.col, met.row, merge)
                 if _finp:
                     logging.debug('burn transparency %s' % (_ftag))
                     _burn_transparency(_img, _load_img(io.BytesIO(_finp)))
         
         return Image.fromarray(_img)
 
-    def _post_proc(self, f, met):
+    def _post_proc(self, f, met, merge):
         if not f:
-            return None
+            return False
             
-        _f = file_mag.get(f).get()
         if 'burn_band' in met or 'burn_transparency' in met:
-            _img = self._burn(_f, met)
-            with open(_f, 'wb') as _fo:
-                _img.save(_fo, format='PNG')
-                
-            # if f != _f:
-            #     file_mag.get(f).put(_f)
-                
-            # _buf = io.BytesIO()
-            # _img.save(_buf, format='PNG')
-            # return _buf.getvalue()
+            _img = self._burn(f, met, merge)
+            f.write(image_to_bytes(_img))
+            return True
             
-        return _f
+        return False
         
     def _read_file(self, f):
         return file_mag.get(f).read()
@@ -216,45 +286,62 @@ class map_tile:
         _im.save(_io, format='PNG')
         return _io.getvalue()
 
-    def get_image(self, tag, lev, col, row):
+    def read(self, met, d_web, tag, lev, col, row, merge=1):
         from geo_map_util import map_tile
         
-        _met = self._load_setting(tag, lev, col, row)
-        _tile = map_tile.tile(lev, col, row, _met.get('tile_merge', 1))
-        _d_web = config.get_at('general', 'map_path')
+        _tile = map_tile.tile(lev, col, row, merge)
+        _out_file = _tile.file(os.path.join(d_web, met.tag), met.get('version', 1.0))
 
-        _out_file = _tile.file(os.path.join(_d_web, _met.tag), _met.get('version', 1.0))
         if _out_file.exists():
             return _out_file.read()
             
-        with file_unzip.zip() as _zip:
-            _cache = config.get('conf', 'cache', None)
-            if not _cache:
-                _tmp = _zip.generate_file()
-                config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+        self._dmap_mag_single(met)
+        
+        if not _out_file.exists():
+            _ooo = self._nodata_image(merge * 256)
+            if config.getboolean('conf', 'keep_nodata_tiles', True):
+                _out_file.write(_ooo)
+            return _ooo
 
-            self._dmap_mag_single(_met)
-            _is_nodata = not _out_file.exists()
-            
-            # logging.info('existance of the output %s' % _is_nodata)
-            # logging.info('keep nodata %s' % config.getboolean('conf', 'keep_nodata_tiles', True))
-            if _is_nodata:
-                _ooo = self._nodata_image(_met.get('tile_merge', 1) * 256)
-                if config.getboolean('conf', 'keep_nodata_tiles', True):
-                    _out_file.write(_ooo)
-                return _ooo
+        self._post_proc(_out_file, met, merge)
+        return _out_file.read()
 
-            _out = str(_out_file)
-            _ooo = self._post_proc(_out, _met)
-            if _out != _ooo:
-                _out_file.put(_ooo)
-            
-            return self._read_file(_ooo)
+class map_tile_util:
 
-        raise Exception('no module found %s' % tag)
+    def _load_setting(self, tag, lev, col, row):
+        import os
+        from gio import obj
+        from gio import config
+        from gio import file_mag
+        from gio import obj
 
-    def get(self, tag, lev, col, row):
-        _img = self.get_image(tag, lev, col, row)
+        _out = os.path.join(config.get('general', 'map_path'), tag)
+
+        _f_ini = file_mag.get(os.path.join(_out, 'setting.ini')).get()
+        if _f_ini:
+            _met = obj.load(_f_ini)
+        else:
+            _met = obj.obj()
+
+        _met.lev = lev
+        _met.row = row
+        _met.col = col
+        _met.tag = tag
+
+        return _met
+
+    def _get(self, tag, lev, col, row, merge=1):
+        _met = self._load_setting(tag, lev, col, row)
+        _d_web = config.get_at('general', 'map_path')
+
+        _merge = _met.get('tile_merge', 1)
+        if _merge == merge:
+            return map_tile_task().read(_met, _d_web, tag, lev, col, row, merge)
+
+        return tile_merge().read(tile_r(lev, col, -row, merge), _merge, _met, _d_web, tag)
+
+    def get(self, tag, lev, col, row, merge=1):
+        _img = self._get(tag, lev, col, row, merge)
         if not _img:
             return None
         return _img
@@ -337,7 +424,7 @@ def _normalize_path(p, order):
 
     return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
         
-def get(path, tile_order='zx_y'):
+def get(path, tile_order='zx_y', merge=1):
     import os
 
     _path = path
@@ -359,6 +446,8 @@ def get(path, tile_order='zx_y'):
     if _pss is None:
         return None
         
-    _out = map_tile().get(**_pss)
+    _pss['merge'] = merge
+    _out = map_tile_util().get(**_pss)
+    
     logging.debug('output %s, %s' % (_path, len(_out)))
     return _out
