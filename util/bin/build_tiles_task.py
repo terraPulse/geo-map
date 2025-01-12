@@ -135,25 +135,18 @@ def create_tasks(met, opts, levels, fzip):
     
     return _ps
 
-def make_tile(lev, num, col, row, params, opts, inp):
-    _tag = opts.tag
-    _loc = '%s/%s/%s/%s.png' % (opts.tag, lev, col, row)
-    
-    from geo_map_util import map_tile_parse
-    return map_tile_parse.get(_loc)
-
-    import os
+def make_tile(lev, num, col, row, met, opts, inp):
+    from geo_map_util import map_tile_task
+    from geo_map_util import map_tile
     from gio import config
     
-    out = config.get('conf', 'output') or inp
-    clr = os.path.join(inp, 'color.txt')
-    
-    pec, vals, solid_bg, msk = params.get('percent'), params.get('valid_vals'), \
-                params.get('solid_bg'), params.get('mask')
-    
-    from geo_map_util import map_tile
-    map_tile.make_tile(params.get('file'), lev, col, row, pec, vals, solid_bg, clr, msk, out, \
-            agg=params.get('agg'), opts=params)
+    _tag = opts.tag
+    met.tag = _tag
+
+    _tile = map_tile.tile(lev, col, row, met.get('tile_merge', 1))
+    _d_web = config.get('general', 'map_path')
+
+    return map_tile_task.map_tile_task().read(met, _d_web, _tag, _tile)
     
 def parse_levels(lvls):
     import re
@@ -234,7 +227,7 @@ def usage():
     _p.add_argument('-s', '--setting', dest='setting')
     _p.add_argument('-c', '--cache', dest='cache')
     
-    _p.add_argument('-k', '--keep-nodata-tiles', dest='keep_nodata_tiles', type='bool', default=True,
+    _p.add_argument('-k', '--keep-nodata-tiles', dest='keep_nodata_tiles', type='bool', default=False,
                    help='keep the nodata map tiles')
     _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
             help='remove the tiles previously generated for the layer')
