@@ -23,7 +23,6 @@ class interpo:
         _t = self.tile.zx_y
 
         _f = f'{_repo}/{_m}/tiles/{_t.z}/{_t.x}/{_t.y}.png'
-        print('file', _f)
         return _f
 
     def config(self):

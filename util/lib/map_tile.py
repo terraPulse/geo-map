@@ -133,7 +133,7 @@ class zxy:
     def __init__(self, z, x, y, merge=1):
         self.z = z
         self.x = x
-        self.y = y if y > 0 else rrow(z, y, merge)
+        self.y = y if y >= 0 else rrow(z, y, merge)
         self.merge = merge
         
     @staticmethod

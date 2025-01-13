@@ -33,7 +33,7 @@ class tile_merge:
     
     def read_tile(self, tile_src, tile_tar, met, d_inp, tag):
         _bb = self.tile_union(tile_src, tile_tar)
-        
+
         if _bb['x2'] <= _bb['x1'] or _bb['y2'] <= _bb['y1']:
             return None
     
@@ -68,7 +68,6 @@ class tile_merge:
                                    self.c_col(_col, merge), \
                                    self.c_row(_row, merge, t.level), \
                                    merge)
-                
                 _i = self.read_tile(_z, t, met, d_inp, tag)
                 if not _i:
                     continue

@@ -46,7 +46,7 @@ class map_tile_util:
 
         _zxy = map_tile.zxy.from_tile(tile)
         _intp = map_tile_interpo.interpo(tag, _zxy)
-        
+
         if _intp.enabled() and (tile.z not in _intp.levels()):
             return _intp.interpolate()
 

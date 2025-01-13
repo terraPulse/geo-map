@@ -120,12 +120,7 @@ class map_tile_task:
 
         _valid_vals = met.get('valid_vals')
         _mask = met.get('mask')
-        _min_level = met.get('min_dynamic_level', self.min_level)
-
-        if config.getboolean('conf', 'skip_low_levels', True) and _lev < _min_level:
-            logging.warning('skip level %s < %s' % (_lev, _min_level))
-            return
-
+        
         if _inp is None:
             return
 
@@ -205,12 +200,19 @@ class map_tile_task:
         _im.save(_io, format='PNG')
         return _io.getvalue()
 
-    def read(self, met, d_web, tag, tile):
+    def read(self, met, d_web, tag, tile, building_tiles=False):
         _out_file = tile.file(os.path.join(d_web, tag), met.get('version', 1.0))
 
         if _out_file.exists():
             return _out_file.read()
 
+        if not building_tiles:
+            _min_level = met.get('min_dynamic_level', self.min_level)
+            
+            if config.getboolean('conf', 'skip_low_levels', True) and tile.z < _min_level:
+                logging.warning('skip level %s < %s' % (tile.z, _min_level))
+                return
+        
         self._dmap_mag_single(met, tile)
         
         if not _out_file.exists():
