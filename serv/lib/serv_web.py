@@ -12,6 +12,7 @@ class web(serv_base.service_base):
         serv_base.service_base.__init__(self, request)
 
     def _add_maps_list(self, f_map, host, fzip):
+        import os
         from gio import file_mag
 
         _f_map = file_mag.get(os.path.join(f_map, 'list.txt'))
