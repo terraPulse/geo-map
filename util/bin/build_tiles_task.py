@@ -128,7 +128,7 @@ def create_tasks(met, opts, levels, fzip):
     for _lev in levels:
         print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
         for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
-            print(_lev, _col, _row)
+            # print(_lev, _col, _row)
             _ps.append((_lev, _num, _col, _row))
 
     logging.info('found %s task' % len(_ps))
