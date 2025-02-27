@@ -56,7 +56,7 @@ def make_tile(f, tile, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, o
         _inp = f # file_mag.get(f).get()
         
         if percent != None:
-            band(_inp, lev, _ext, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
+            band(_inp, tile.level, _ext, f_msk, solid_bg, opts, _zip).make_perc(_ext, percent, \
                     vals, f_clr, _f_tmp, agg=agg, \
                     mag=opts.get('mag', None), opts=opts)
         else:
