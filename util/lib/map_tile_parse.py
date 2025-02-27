@@ -60,7 +60,7 @@ class map_tile_util:
         _img = self.load(tag, _tile)
         
         if not _img:
-            return None
+            return nodata_image(256 * merge)
         return _img
 
 def _parse_url(f):
@@ -115,6 +115,17 @@ def _normalize_path(p, order):
 
     return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
 
+def nodata_image(size):
+    import PIL.Image
+    import io
+
+    _im = PIL.Image.new(mode = "RGBA", size = (size, size),
+                       color = (0, 0, 0, 0))
+
+    _io = io.BytesIO()
+    _im.save(_io, format='PNG')
+    return _io.getvalue()
+        
 def get(path, tile_order='zx_y', merge=1):
     import os
 
@@ -139,6 +150,6 @@ def get(path, tile_order='zx_y', merge=1):
         
     _pss['merge'] = merge
     _out = map_tile_util().get(**_pss)
-    
-    logging.debug('output %s, %s' % (_path, len(_out)))
+
+    logging.debug('output %s, %s' % (_path, len(_out) if _out is not None else '<None>'))
     return _out
