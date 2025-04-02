@@ -142,12 +142,17 @@ def make_tile(lev, num, col, row, met, opts, inp):
     from gio import config
     
     _tag = opts.tag
-    met.tag = _tag
+    
+    _met = met.copy()
+    _met.tag = _tag
+    _met.lev = lev
+    _met.col = col
+    _met.row = row
 
-    _tile = map_tile.tile(lev, col, row, met.get('tile_merge', 1))
+    _tile = map_tile.tile(lev, col, row, _met.get('tile_merge', 1))
     _d_web = config.get('general', 'map_path')
 
-    return map_tile_task.map_tile_task().read(met, _d_web, _tag, _tile)
+    return map_tile_task.map_tile_task().read(_met, _d_web, _tag, _tile)
     
 def parse_levels(lvls):
     import re

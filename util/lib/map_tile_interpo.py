@@ -34,6 +34,7 @@ class interpo:
         
         from gio import file_mag
         import json
+        print('config', _f)
         return json.loads(file_mag.get(_f).read())
 
     def read_file(self):

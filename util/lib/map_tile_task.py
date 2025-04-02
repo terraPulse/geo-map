@@ -40,6 +40,12 @@ def _burn_transparency(b1, b2):
     b1[:, :, 3] = np.minimum(np.minimum(b1[:, :, 3], b2[:, :, 0]), b2[:, :, 3])
     return b1
 
+def image_to_bytes(i):
+    import io
+    _b = io.BytesIO()
+    i.save(_b, format='PNG')
+    return _b.getvalue()
+        
 class map_tile_task:
 
     def __init__(self):
@@ -144,8 +150,10 @@ class map_tile_task:
         return _ps
         
     def _burn(self, f, met, merge):
+        import io
         import numpy as np
         from PIL import Image
+        from . import map_tile_parse
         
         _load_img = lambda x: np.array(Image.open(x))
         
@@ -155,7 +163,7 @@ class map_tile_task:
             _mlev = _opts.getint('level', 1)
             if met.lev >= _mlev:
                 _ftag = _opts.get('input')
-                _finp = map_tile_util().get(_ftag, met.lev, met.col, met.row, merge)
+                _finp = map_tile_parse.map_tile_util().get(_ftag, met.lev, met.col, met.row, merge)
                 if _finp:
                     _offs = _opts.get('offset', 200)
                     logging.debug('burn band %s, %s' % (_ftag, _offs))
@@ -166,7 +174,7 @@ class map_tile_task:
             _mlev = _opts.getint('level', 1)
             if met.lev >= _mlev:
                 _ftag = _opts.get('input')
-                _finp = map_tile_util().get(_ftag, met.lev, met.col, met.row, merge)
+                _finp = map_tile_parse.map_tile_util().get(_ftag, met.lev, met.col, met.row, merge)
                 if _finp:
                     logging.debug('burn transparency %s' % (_ftag))
                     _burn_transparency(_img, _load_img(io.BytesIO(_finp)))
