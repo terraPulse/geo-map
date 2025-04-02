@@ -45,8 +45,7 @@ def load_color_file(f):
         _m = re.match('(\S+)\s+(\d+),(\d+),(\d+),(\d+)', _l)
         if _m:
             _l = ','.join([_m.group(_i+1) for _i in range(5)] + [_m.group(1)])
-        else:
-            print(_l)
+            
         _vv = _l.split(',')
         if len(_vv) != 6:
             continue
