@@ -20,7 +20,7 @@ def _burn_band(b1, b2, offset=200):
     for _b in range(3):
         _o = b1[:, :, _b].astype(np.int16)
         _x = b2[:, :, _b]
-        
+
         _o += _x
         _o -= offset
         
@@ -154,9 +154,8 @@ class map_tile_task:
         import numpy as np
         from PIL import Image
         from . import map_tile_parse
-        
+
         _load_img = lambda x: np.array(Image.open(x))
-        
         _img = _load_img(io.BytesIO(f.read()))
         if 'burn_band' in met:
             _opts = met.get('burn_band', {})

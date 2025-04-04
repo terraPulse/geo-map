@@ -138,7 +138,7 @@ class zxy:
         
     @staticmethod
     def from_tile(tile):
-        return zxy(tile.z, tile.x, rrow(tile.z, -tile.y, tile.merge))
+        return zxy(tile.z, tile.x, rrow(tile.z, -tile.y, tile.merge), tile.merge)
 
     @property
     def tile(self):

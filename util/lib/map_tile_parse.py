@@ -132,7 +132,7 @@ def get(path, tile_order='zx_y', merge=1):
     _path = path
     if not _path:
         _path = '/'
-        
+
     _path = _normalize_path(path, tile_order)
     if not _path:
         from gio import config
