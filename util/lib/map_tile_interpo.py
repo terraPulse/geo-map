@@ -81,8 +81,34 @@ class interpo:
 
         from PIL import Image
         return Image.new('RGBA', (256, 256), (0,0,0,0))
-    
+
     def zoomin(self, level):
+        _ti = self.tile
+        
+        _ld = _ti.z - level
+        if _ld <= 0:
+            return None
+        
+        _z = 256 * _ti.merge
+        _d = 2 ** _ld
+        
+        _tx = int(_ti.x / _d)
+        _ty = int(_ti.y / _d)
+
+        from . import map_tile
+        _to = map_tile.zxy(level, _tx, _ty, max(1, int(self.tile.merge / _d)))
+        _t = interpo(self.map, _to)
+        
+        _m = _t.read_file()
+        if not _m:
+            return None
+            
+        from PIL import Image
+        return _m.resize((_z, _z), resample=Image.NEAREST)
+        
+    def zoomin_tiles(self, level):
+        # deprecated
+        
         _ti = self.tile
         _ld = _ti.z - level
         if _ld <= 0:
@@ -107,6 +133,34 @@ class interpo:
         return _tt.subset(_bb)
 
     def zoomout(self, level):
+        from PIL import Image
+        from . import map_tile
+
+        _ti = self.tile
+        _ld = level - _ti.z
+        
+        _z = 256 * self.tile.merge
+        _d = (2 ** _ld)
+
+        _x = self.tile.x * _d
+        _y = self.tile.y * _d
+        
+        _t = interpo(self.map, map_tile.zxy(level, _x, _y, self.tile.merge * _d))
+        _m = _t.read_file()
+        
+        if not _m:
+            return _m
+
+        _d = (2 ** _ld)
+        _s = int(_z / _d)
+
+        _o = Image.new('RGBA', (_z, _z), (0,0,0,0))
+        _o.paste(_m.resize((_z, _z), resample=Image.BICUBIC), (0, 0))            
+        return _o
+
+    def zoomout_tiles(self, level):
+        # deprecated
+        
         from PIL import Image
         from . import map_tile
 
