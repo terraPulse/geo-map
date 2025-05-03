@@ -44,22 +44,13 @@ class interpo:
         _b = map_tile_parse.map_tile_util().load(self.map, self.tile.zx_y)
         return Image.open(io.BytesIO(_b))
         
-        # from gio import file_mag
-        # _f = file_mag.get(self.file())
-        # if not _f.exists():
-        #     return None
-        
-        # from PIL import Image
-        # import io
-        # return Image.open(io.BytesIO(_f.read()))
-    
-    def subset(self, box):
-        _m = self.read_file()
-        if not _m:
-            return None
+    # def subset(self, box):
+    #     _m = self.read_file()
+    #     if not _m:
+    #         return None
 
-        from PIL import Image
-        return _m.crop(box).resize((256, 256), resample=Image.NEAREST)
+    #     from PIL import Image
+    #     return _m.crop(box).resize((256, 256), resample=Image.NEAREST)
 
     def _image(self, level):
         if level == self.tile.z:
@@ -89,23 +80,30 @@ class interpo:
         if _ld <= 0:
             return None
         
-        _z = 256 * _ti.merge
         _d = 2 ** _ld
+        _z = max(1, _ti.merge / _d)
         
         _tx = int(_ti.x / _d)
         _ty = int(_ti.y / _d)
+        
+        _dx = _ti.x % _d
+        _dy = _ti.y % _d
 
         from . import map_tile
-        _to = map_tile.zxy(level, _tx, _ty, max(1, int(self.tile.merge / _d)))
+        _to = map_tile.zxy(level, _tx, _ty, _z)
         _t = interpo(self.map, _to)
         
         _m = _t.read_file()
         if not _m:
             return None
-            
-        from PIL import Image
-        return _m.resize((_z, _z), resample=Image.NEAREST)
+
+        _ww = _z * 256
+        _ss = int(max(1, _ww / _d))
+        _bb = (_dx * _ss, _dy * _ss, (_dx + 1) * _ss, (_dy + 1) * _ss)
         
+        from PIL import Image
+        return _m.crop(_bb).resize((_ti.merge * 256, _ti.merge * 256), resample=Image.NEAREST)
+
     def zoomin_tiles(self, level):
         # deprecated
         
