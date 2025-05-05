@@ -22,7 +22,7 @@ class tile_merge:
     
     def empty_image(self, merge=1):
         from PIL import Image
-        return Image.new('RGBA', (256 * merge, 256 * merge), (0,0,0,0))
+        return Image.new('RGBA', (256 * int(merge), 256 * int(merge)), (0,0,0,0))
     
     def make_box(self, bb, t):
         _sx = t.col
