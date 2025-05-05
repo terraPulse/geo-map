@@ -165,12 +165,12 @@ def parse_levels(lvls):
     
     _ls = []
     for _l in lvls:
-        _m = re.match('^[0-9]+$', _l)
+        _m = re.match(r'^[0-9]+$', _l)
         if _m:
             _ls.append(int(_l))
             continue
             
-        _m = re.match('^([0-9]+)\-([0-9]+)$', _l)
+        _m = re.match(r'^([0-9]+)\-([0-9]+)$', _l)
         if _m:
             for _z in range(int(_m.group(1)), int(_m.group(2)) + 1):
                 _ls.append(_z)
@@ -244,7 +244,7 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
     # if opts.options:
     #     import re
     #     for _co in opts.options:
-    #         _m = re.match('(.+)\s*\=\s*(.+)', _co)
+    #         _m = re.match(r'(.+)\s*\=\s*(.+)', _co)
     #         if _m:
     #             print 'option %s=%s' % (_m.group(1), _m.group(2))
     #             _obj[_m.gruop(1)] = _m.group(2)
