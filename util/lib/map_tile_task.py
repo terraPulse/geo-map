@@ -217,8 +217,7 @@ class map_tile_task:
             _min_level = met.get('min_dynamic_level', self.min_level)
             
             if config.getboolean('conf', 'skip_low_levels', True) and tile.z < _min_level:
-                logging.warning('skip level %s < %s' % (tile.z, _min_level))
-                return
+                return self._nodata_image(tile.merge * 256)
         
         self._dmap_mag_single(met, tile)
         
