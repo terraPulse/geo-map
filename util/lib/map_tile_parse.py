@@ -42,7 +42,7 @@ class map_tile_util:
         
         _met = self._load_setting(tag, tile)
         _d_web = config.get_at('general', 'map_path')
-        _merge = _met.get('tile_merge', 1)
+        _merge = int(_met.get('tile_merge', 1))
 
         _zxy = map_tile.zxy.from_tile(tile)
         _intp = map_tile_interpo.interpo(tag, _zxy)

@@ -13,7 +13,7 @@ class tile:
         self.z = z
         self.x = x
         self.y = y
-        self.merge = merge
+        self.merge = int(merge)
         self.tiles = tile_mag(merge)
 
     def size(self):
@@ -86,7 +86,7 @@ class tile_mag:
         self.b = 6378137.0
         
         self.s = 256
-        self.merge = merge
+        self.merge = int(merge)
         if self.merge < 1:
             raise Exception('merging factor too small (%s)' % self.merge)
             
@@ -120,7 +120,7 @@ class tile_mag:
 
 def rrow(lev, row, merge=1):
     assert row <= 0
-    return (2 ** lev) + row - merge
+    return (2 ** lev) + row - int(merge)
 
 def image_to_bytes(i):
     import io
