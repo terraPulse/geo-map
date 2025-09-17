@@ -6,7 +6,7 @@ File: enable_dynamic_levels.py
 Author: Min Feng
 Version: 0.1
 Create: 2023-11-2020 16:02:12
-Description:
+Description: Enable dynamic levels for a map layer and optionally trigger tile generation.
 '''
 
 import logging
@@ -71,10 +71,10 @@ def main(opts):
 def usage():
     _p = environ_mag.usage(True)
 
-    _p.add_argument('-i', '--input', dest='input')
-    _p.add_argument('-t', '--tag', dest='tag', required=True)
-    _p.add_argument('-l', '--levels', dest='levels', nargs='*', required=True)
-    _p.add_argument('-e', '--execute', dest='execute', type='bool')
+    _p.add_argument('-i', '--input', dest='input', help='input repository')
+    _p.add_argument('-t', '--tag', dest='tag', required=True, help='layer tag')
+    _p.add_argument('-l', '--levels', dest='levels', nargs='*', required=True, help='levels to enable, e.g. 0-14 15 16')
+    _p.add_argument('-e', '--execute', dest='execute', type='bool', help='execute tile generation after enabling levels', default=False )
 
     return _p
 
