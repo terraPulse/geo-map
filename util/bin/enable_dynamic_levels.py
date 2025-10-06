@@ -35,12 +35,12 @@ def parse_levels(lvls):
     
     _ls = []
     for _l in lvls:
-        _m = re.match('^[0-9]+$', _l)
+        _m = re.match(r'^[0-9]+$', _l)
         if _m:
             _ls.append(int(_l))
             continue
             
-        _m = re.match('^([0-9]+)\-([0-9]+)$', _l)
+        _m = re.match(r'^([0-9]+)\-([0-9]+)$', _l)
         if _m:
             for _z in range(int(_m.group(1)), int(_m.group(2)) + 1):
                 _ls.append(_z)
