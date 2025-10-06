@@ -1,63 +1,23 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 '''
 File: build_tiles_task.py
 Author: Min Feng
 Version: 0.1
 Create: 2015-09-10 16:02:12
+
 Description:
+This module provides utilities for generating map tiles from geospatial data, supporting both raster and vector formats.
+It includes functions for loading shapefiles and raster images, determining tile extents, creating tile generation tasks,
+and running tile generation in parallel. The module is designed to work with the gio and geo_map_util libraries.
+
+Notes:
+------
+- The module expects the gio and geo_map_util libraries to be available.
+- The commented-out 'tiles' class provides a reference implementation for tile calculations.
+- The script is intended to be run as a standalone command-line utility.
 '''
 
 import logging
-
-# class tiles:
-
-#     def __init__(self):
-#         import math
-#         from gio import geo_raster as ge
-
-#         self.b = 6378137.0
-#         self.s = 256
-#         self.p = self.b * math.pi
-
-#         self.prj = ge.proj_from_epsg(3857)
-
-#     def list(self, level, ext=None):
-#         from gio import geo_base as gb
-
-#         _r = (2 * self.p) / (2 ** level)
-
-#         _rows = 2 ** level
-#         _cols = 2 ** level
-
-#         _num = -1
-#         for _row in range(_rows):
-#             for _col in range(_cols):
-#                 _num += 1
-
-#                 _x = -self.p + (_col * _r)
-#                 _y = -self.p + (_row * _r)
-
-#                 _ext = gb.geo_extent(_x, _y, _x + _r, _y + _r, self.prj)
-#                 if ext is None or _ext.is_intersect(ext):
-#                     yield level, _num, _col, _row
-
-#     def cell(self, level):
-#         _r = (2 * self.p) / (2 ** level)
-#         return _r / self.s
-
-#     def extent(self, level, col, row):
-#         _r = (2 * self.p) / (2 ** level)
-#         _c = _r / self.s
-
-#         _x = -self.p + (col * _r)
-#         _y = -self.p + (row * _r)
-
-#         _geo = [_x, _c, 0, _y + _r, 0, -_c]
-
-#         from gio import geo_raster as ge
-#         return ge.geo_raster_info(_geo, self.s, self.s, self.prj)
 
 def load_shp(f):
     from osgeo import ogr
@@ -92,6 +52,37 @@ def load_shp(f):
     _reg = _area.to_polygon().segment_ratio(30).project_to(_prj)
     return _reg.extent()
 
+def load_ext(f, ext=None):
+    from osgeo import ogr
+    from gio import file_mag
+    from gio import geo_base as gb
+    from gio import geo_raster as ge
+
+    _shp = ogr.Open(file_mag.get(f).get())
+    if _shp is None:
+        raise Exception('Failed to load shapefile ' + f)
+
+    _prj = ge.proj_from_epsg(3857)
+
+    _lyr = _shp.GetLayer()
+    _exts = []
+
+    for _f in _lyr:
+        _geo = _f.geometry()
+        if _geo is None:
+            continue
+        
+        _obj = gb.geo_polygon(_geo.Clone()).project_to(_prj)
+        _ext = _obj.extent()
+        if ext is not None:
+            _ext = _ext.intersect(ext)
+            if _ext is None:
+                continue
+
+        _exts.append(_ext)
+
+    return _exts
+
 def load_img(f, fzip):
     from gio import geo_raster as ge
 
@@ -115,21 +106,23 @@ def create_tasks(met, opts, levels, fzip):
 
     # detect the extent of input file
     _ext = load_shp(_f) if f_inp.endswith('.shp') or f_inp.upper().startswith('PG:') else load_img(_f, fzip)
+    
     if f_reg:
-        _rrr = load_shp(f_reg)
-        _ext = _ext.intersect(_rrr)
-
-    logging.info('detected extent %s' % str(_ext))
-    print('detected extent', _ext)
+        logging.info('extent file %s' % f_reg)
+        _exts = load_ext(f_reg, _ext)
+    else:
+        _exts = [_ext]
 
     _tiles = map_tile.tile_mag(met.get('tile_merge', 1))
 
     _ps = []
     for _lev in levels:
         print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
-        for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
-            # print(_lev, _col, _row)
-            _ps.append((_lev, _num, _col, _row))
+        for _ext in _exts:
+            for _lev, _num, _col, _row in _tiles.list(_lev, _ext):
+                _as = (_lev, _num, _col, _row)
+                if _as not in _ps:
+                    _ps.append(_as)
 
     logging.info('found %s task' % len(_ps))
     print('found %s tasks' % len(_ps))
@@ -233,10 +226,10 @@ def usage():
     _p.add_argument('-s', '--setting', dest='setting')
     _p.add_argument('-c', '--cache', dest='cache')
     
-    _p.add_argument('-k', '--keep-nodata-tiles', dest='keep_nodata_tiles', type='bool', default=False,
-                   help='keep the nodata map tiles')
+    _p.add_argument('-k', '--keep-nodata-tiles', dest='keep_nodata_tiles', type='bool', default=False, \
+                    help='keep the nodata map tiles')
     _p.add_argument('--clean-tiles', dest='clean_tiles', type='bool', \
-            help='remove the tiles previously generated for the layer')
+                    help='remove the tiles previously generated for the layer')
 
     _p.add_argument('-r', '--region', dest='region')
     _p.add_argument('-l', '--levels', dest='levels', nargs='*')
