@@ -321,15 +321,16 @@ def main(opts):
     from osgeo import gdal
     gdal.UseExceptions()
     
-    if opts.hillshade:
-        opts.burn_band_input = 'dem/aw3d30/hillshade-lit'
-        opts.burn_band_offset = 180
-        opts.burn_band_level = 1
-        
     from gio import config
     from gio import run_commands
     import os
     
+    if opts.hillshade:
+        _hillshade = config.get('conf', 'hillshade_layer')
+        opts.burn_band_input = _hillshade
+        opts.burn_band_offset = 180
+        opts.burn_band_level = 1
+        
     _d_out = format_path(os.path.join(config.get('conf', 'output'), opts.tag))
 
     from gio import file_unzip
@@ -406,7 +407,8 @@ def usage():
     _p.add_argument('--overwrite-pg-layer', dest='overwrite_pg_layer', type='bool')
     
     _p.add_argument('--hillshade', dest='hillshade', type='bool')
-    
+    _p.add_argument('--hillshade-layer', dest='hillshade_layer', default='dem/aw3d30/hillshade-lit2')
+
     _p.add_argument('--burn-band-input', dest='burn_band_input')
     _p.add_argument('--burn-band-offset', dest='burn_band_offset', type=int, default=250)
     _p.add_argument('--burn-band-level', dest='burn_band_level', type=int, default=1)
@@ -422,7 +424,6 @@ def usage():
     
     _p.add_argument('--postgis', '--convert-to-postgis', dest='convert_to_postgis', type='bool', 
                     help='convert the data list to postgis')
-
     _p.add_argument('--interpo-levels', dest='interpo_levels', nargs='+', help='levels for map tile interpolation')
     _p.add_argument('--tile-merge', dest='tile_merge', type=int, default=1)
 
