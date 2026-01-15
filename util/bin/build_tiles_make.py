@@ -162,9 +162,14 @@ def to_pg(f, tag=None, overwrite=True):
 
 def parse_levels(lvls):
     import re
+
+    _lvls = lvls
+    if len(lvls) == 2:
+        if all([re.match(r'^\d+$', _l) for _l in _lvls]):
+            _lvls = ['-'.join(_lvls)]
     
     _ls = []
-    for _l in lvls:
+    for _l in _lvls:
         _m = re.match(r'^[0-9]+$', _l)
         if _m:
             _ls.append(int(_l))
@@ -177,8 +182,8 @@ def parse_levels(lvls):
             continue
                 
         raise Exception('failed to parse {}'.format(_l))
-        
-    return _ls
+    
+    return sorted(list(set(_ls)))
 
 def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_out, d_ooo, fzip, opts):
     import os
@@ -310,12 +315,15 @@ def make(tag, f_inp, f_clr, f_tclr, levels, title, percent, valid_vals, agg, d_o
         _obj.burn_transparency.input = opts.burn_transparency_input
         _obj.burn_transparency.level = opts.burn_transparency_level
 
+    _lvs = parse_levels(['-'.join(map(str, opts.levels))])
     if opts.interpo_levels:
         _lvs = parse_levels(opts.interpo_levels)
         print('enabling interpolation from levels: %s' % _lvs)
         _obj.processed_levels = _lvs
         
     _obj.save(os.path.join(d_out, 'setting.ini'))
+
+    return _lvs
     
 def main(opts):
     from osgeo import gdal
@@ -340,7 +348,7 @@ def main(opts):
         _d_tmp = _zip.generate_file()
         os.makedirs(_d_tmp)
         
-        make(opts.tag, _f_inp, config.get('conf', 'color'), config.get('conf', 'translate_color'), \
+        _lvs = make(opts.tag, _f_inp, config.get('conf', 'color'), config.get('conf', 'translate_color'), \
                 opts.levels, opts.title, opts.percent, opts.valid_vals, opts.agg, _d_tmp, \
                 _d_out, _zip, opts)
                 
@@ -356,26 +364,26 @@ def main(opts):
 
         file_unzip.compress_folder(_d_tmp, _d_out, [])
         
-    # update the map list ot add the new layer
-    if opts.update_list:
-        print('update map list')
-        from geo_map_util import map_tile_util
-        map_tile_util.add_item_to_list(opts.tag, config.get('conf', 'output'))
-        
-        # _cmd = 'update_map_list.py -o %s' % config.get('conf', 'output')
-        # run_commands.run(_cmd)
+        # update the map list ot add the new layer
+        if opts.update_list:
+            print('update map list')
+            from geo_map_util import map_tile_util
+            map_tile_util.add_item_to_list(opts.tag, config.get('conf', 'output'))
+            
+            # _cmd = 'update_map_list.py -o %s' % config.get('conf', 'output')
+            # run_commands.run(_cmd)
 
-    if opts.execute:
-        print('generate map tiles')
+        if opts.execute:
+            print('generate map tiles')
 
-        _cmd = 'build_tiles_task.py -t %s -i %s ' % (opts.tag, config.get('conf', 'output'))
-        # _agg = ' -a %s ' % opts.agg if opts.agg else ''
-        _tsk = '-in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
-                opts.instance_num, opts.instance_pos, opts.task_num, \
-                        '-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
+            _cmd = 'build_tiles_task.py -t %s -i %s ' % (opts.tag, config.get('conf', 'output'))
+            # _agg = ' -a %s ' % opts.agg if opts.agg else ''
+            _tsk = '-l %s -in %s -ip %s -ts %s %s -tw %s -to %s' % ( \
+                    ' '.join(map(str, _lvs)), opts.instance_num, opts.instance_pos, opts.task_num, \
+                            '-se' if opts.skip_error else '', opts.time_wait, opts.task_order)
 
-        # run_commands.run(_cmd + _agg + _tsk)
-        run_commands.run(_cmd + _tsk)
+            # run_commands.run(_cmd + _agg + _tsk)
+            run_commands.run(_cmd + _tsk)
 
 def usage():
     _p = environ_mag.usage(True)
@@ -424,7 +432,7 @@ def usage():
     
     _p.add_argument('--postgis', '--convert-to-postgis', dest='convert_to_postgis', type='bool', 
                     help='convert the data list to postgis')
-    _p.add_argument('--interpo-levels', dest='interpo_levels', nargs='+', help='levels for map tile interpolation')
+    _p.add_argument('-ll', '--interpo-levels', dest='interpo_levels', nargs='+', help='levels for map tile interpolation')
     _p.add_argument('--tile-merge', dest='tile_merge', type=int, default=1)
 
     return _p

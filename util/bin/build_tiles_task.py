@@ -91,7 +91,18 @@ def load_img(f, fzip):
 
     return _reg.extent()
 
+def parse_tile(t):
+    import re
+    _ts = [int(_t) for _t in re.split('/', t)]
+    return [_ts[0], 0, _ts[1], _ts[2]]
+
 def create_tasks(met, opts, levels, fzip):
+    _ps = []
+    if opts.test_tiles is not None:
+        for _t in opts.test_tiles:
+            _ps.append(parse_tile(_t))
+        return _ps
+            
     import os
     from gio import file_mag
     from gio import obj
@@ -115,7 +126,6 @@ def create_tasks(met, opts, levels, fzip):
 
     _tiles = map_tile.tile_mag(met.get('tile_merge', 1))
 
-    _ps = []
     for _lev in levels:
         print(' - checking level', _lev, '(%.2f)' % _tiles.cell(_lev))
         for _ext in _exts:
@@ -149,9 +159,14 @@ def make_tile(lev, num, col, row, met, opts, inp):
     
 def parse_levels(lvls):
     import re
+
+    _lvls = lvls
+    if len(lvls) == 2:
+        if all([re.match(r'^\d+$', _l) for _l in _lvls]):
+            _lvls = ['-'.join(_lvls)]
     
     _ls = []
-    for _l in lvls:
+    for _l in _lvls:
         _m = re.match(r'^[0-9]+$', _l)
         if _m:
             _ls.append(int(_l))
@@ -164,7 +179,7 @@ def parse_levels(lvls):
             continue
                 
         raise Exception('failed to parse {}'.format(_l))
-        
+    
     return sorted(list(set(_ls)))
 
 def load_levels(met):
@@ -233,6 +248,7 @@ def usage():
 
     _p.add_argument('-r', '--region', dest='region')
     _p.add_argument('-l', '--levels', dest='levels', nargs='*')
+    _p.add_argument('--test-tiles', dest='test_tiles', nargs='*')    
 
     return _p
 
