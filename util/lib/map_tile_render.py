@@ -25,7 +25,7 @@ def _mask_grid(bnd, f, fzip):
         if _shp[0] != 4:
             raise Exception('no transparency band provided')
             
-        bnd.data[3, :, :] = 0
+        bnd.data[3, :, :][_msk.data != 1] = 0
         return
     
     raise Exception('failed to recognize the image type')
@@ -533,14 +533,15 @@ class band:
         _bnd.to_image().save(f)
 
     def _save_band(self, bnd, cs, f_out, opts):
-        if cs == None or list(cs.keys()) == 0:
-            raise Exception('failed to find color table')
-
         if len(bnd) == 0:
             return
         
+        # Multi-band RGB composites do not use a color table
         if len(bnd) > 1:
             return self._img_to_png(bnd, f_out, opts)
+
+        if cs is None or len(cs) == 0:
+            raise Exception('failed to find color table')
             
         if bnd[0] == None:
             return
