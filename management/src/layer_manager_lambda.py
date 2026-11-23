@@ -1,9 +1,12 @@
 """API Gateway and CloudFormation entrypoint.
 
 Signature checks stay with the API Gateway Cognito JWT authorizer. This
-module does not create users, write tiles, or call AWS except the
-CloudFormation response URL and the DynamoDB client the repository builds.
+module does not create users or write tiles. When renderer mode is lambda,
+build_api constructs a Lambda client for the fixed function ARN. PNG
+responses are base64 for HTTP API payload format 2.0. JSON stays plain text.
 """
+
+import base64
 
 from layer_manager.app_factory import build_api
 from layer_manager.cfn_response import send_cfn_response
@@ -35,8 +38,6 @@ def api_handler(event, context, api=None):
     query = event.get("queryStringParameters") or {}
     body = event.get("body") or b""
     if event.get("isBase64Encoded") and isinstance(body, str):
-        import base64
-
         body = base64.b64decode(body)
     status, response_headers, payload = api.handle(
         method,
@@ -46,10 +47,22 @@ def api_handler(event, context, api=None):
         body,
         apigateway_event=event,
     )
+    content_type = str(response_headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if content_type == "image/png" and isinstance(payload, (bytes, bytearray)):
+        return {
+            "statusCode": status,
+            "headers": response_headers,
+            "body": base64.b64encode(payload).decode("ascii"),
+            "isBase64Encoded": True,
+        }
+    if isinstance(payload, (bytes, bytearray)):
+        text = payload.decode("utf-8")
+    else:
+        text = "" if payload is None else str(payload)
     return {
         "statusCode": status,
         "headers": response_headers,
-        "body": payload.decode("utf-8"),
+        "body": text,
         "isBase64Encoded": False,
     }
 

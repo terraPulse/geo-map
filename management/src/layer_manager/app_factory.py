@@ -26,5 +26,9 @@ def build_api(settings, dynamo_client=None, repository=None, build_store=None, r
     service = build_service(repo, settings)
     root = settings.file_root or "/tmp/layer-manager-builds"
     builds = BuildService(build_store or MemoryBuildStore(), settings, service, root)
+    if renderer_invoker is None and settings.renderer_mode == "lambda":
+        from .renderer_preview import lambda_client_from_config
+
+        renderer_invoker = lambda_client_from_config(settings)
     preview = RendererPreview(settings, invoker=renderer_invoker)
     return Api(service, settings, builds=builds, preview=preview)

@@ -78,6 +78,23 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(self.template["Parameters"]["BuildImageUri"]["Default"], "")
         self.assertEqual(self.template["Parameters"]["BuildSubnetIds"]["Default"], "")
         self.assertEqual(self.template["Parameters"]["BuildSecurityGroupId"]["Default"], "")
+        rules = json.dumps(self.template["Rules"])
+        self.assertNotIn("Split", rules)
+        self.assertNotIn("Select", rules)
+        self.assertIn("544020760996", rules)
+        self.assertIn("us-west-2", rules)
+        pattern = self.template["Parameters"]["SourceBucketName"]["AllowedPattern"]
+        import re
+
+        compiled = re.compile(pattern)
+        self.assertIsNotNone(compiled.match(""))
+        self.assertIsNotNone(compiled.match("example-datasets"))
+        self.assertIsNone(compiled.match("geo-map-tiles-w2"))
+        self.assertIsNone(compiled.match("geo-map-tiles-dev"))
+        self.assertIsNone(compiled.match("map-tiles-dev"))
+        csp = self.template["Resources"]["ResponseHeadersPolicy"]["Properties"]["ResponseHeadersPolicyConfig"]["SecurityHeadersConfig"]["ContentSecurityPolicy"]["ContentSecurityPolicy"]
+        self.assertIn("img-src 'self' data: blob:", json.dumps(csp))
+        self.assertNotIn("script-src 'self' blob:", json.dumps(csp))
         self.assertIn("BuildInfra", self.template["Conditions"])
         self.assertNotIn("s3:DeleteObject", self.text)
         self.assertIn("iam:PassRole", self.text)

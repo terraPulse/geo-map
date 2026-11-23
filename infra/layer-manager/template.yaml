@@ -21,10 +21,6 @@ Rules:
         AssertDescription: Deploy only in terraPulse account 544020760996. The executor CLI profile is tp. Do not use profile 6g.
       - Assert: !Equals [!Ref "AWS::Region", "us-west-2"]
         AssertDescription: Deploy only in us-west-2 (Oregon).
-      - Assert: !Equals [!Select [0, !Split ["geo-map-tiles", !Ref SourceBucketName]], !Ref SourceBucketName]
-        AssertDescription: SourceBucketName must not refer to a production tile bucket.
-      - Assert: !Equals [!Select [0, !Split ["map-tiles-dev", !Ref SourceBucketName]], !Ref SourceBucketName]
-        AssertDescription: SourceBucketName must not refer to map-tiles-dev.
 
 Parameters:
   ProjectName:
@@ -96,8 +92,12 @@ Parameters:
   SourceBucketName:
     Type: String
     Default: ""
-    AllowedPattern: "^$|^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
-    Description: Optional read-only dataset bucket. Empty disables real builds. Do not use a tile bucket.
+    AllowedPattern: "^$|^(?!.*geo-map-tiles)(?!.*map-tiles-dev)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    Description: >
+      Optional raw-raster build source. Empty disables real builds. Names containing
+      geo-map-tiles or map-tiles-dev are rejected here. The operator selected
+      s3://geo-map-tiles-dev/tiles as the first test location; that name stays out of
+      this parameter until a format report says whether it is a tile import or a raster source.
   SourceKeyPrefix:
     Type: String
     Default: "datasets/"
@@ -181,7 +181,7 @@ Resources:
         SecurityHeadersConfig:
           ContentSecurityPolicy:
             ContentSecurityPolicy: !Sub
-              - "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://${Prefix}.auth.${AWS::Region}.amazoncognito.com https://*.execute-api.${AWS::Region}.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://${Prefix}.auth.${AWS::Region}.amazoncognito.com; object-src 'none'"
+              - "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://${Prefix}.auth.${AWS::Region}.amazoncognito.com https://*.execute-api.${AWS::Region}.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://${Prefix}.auth.${AWS::Region}.amazoncognito.com; object-src 'none'"
               - Prefix: !Ref CognitoDomainPrefix
             Override: true
           ContentTypeOptions:

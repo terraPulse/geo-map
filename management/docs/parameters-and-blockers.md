@@ -14,7 +14,8 @@ Target, when the parent deploys: account `544020760996`, region `us-west-2`, CLI
 
 | Item | State in this branch |
 | --- | --- |
-| Tile test endpoint | `TileBackendBaseUrl` default is empty. Preview status is `awaiting-parent-endpoint`. Not integrated. |
+| Tile test endpoint | `TileBackendBaseUrl` default is empty. Preview of the test renderer is a Lambda invoke of `geomap-tile-pyramid-test` only when `RendererInvokeEnabled=true`. |
+| First test location | The operator selected `s3://geo-map-tiles-dev/tiles`. Format is not assumed. The build allowlist still refuses that bucket name. No source grant or build job is added. |
 | First admin | Pool has no users and sends no invitations. Enroll with `--message-action SUPPRESS` after the identity is confirmed. MFA is required. |
 | Registry schema in `interfaces/` | Not copied. Parent reconciles `layer-registry-v1.schema.json` before shared use. |
 | Production catalog | Refused. Fixtures are synthetic. Live `setting.ini` paths that name `geo-map-tiles` cannot be stored. |

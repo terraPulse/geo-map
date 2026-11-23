@@ -27,6 +27,21 @@ def validate_function_arn(arn):
         )
 
 
+def lambda_client_from_config(settings):
+    """Build the Lambda client used by the deployed entrypoint. No invoke happens here."""
+    validate_function_arn(settings.renderer_function_arn)
+    if settings.authorized_region != "us-west-2":
+        raise ConfigurationError("Renderer invoke region must be us-west-2. No AWS call was made.")
+    import boto3
+    from botocore.config import Config
+
+    return boto3.client(
+        "lambda",
+        region_name="us-west-2",
+        config=Config(connect_timeout=2, read_timeout=8, retries={"max_attempts": 2}),
+    )
+
+
 def apigateway_event(path):
     if not isinstance(path, str) or len(path) > 1024 or not path.startswith(API_PREFIX + "/"):
         raise ValidationFailed("Renderer path is not allowed.", [])
@@ -175,12 +190,20 @@ class RendererPreview:
         validate_function_arn(self.settings.renderer_function_arn)
         if self.invoker is None:
             raise Conflict("Renderer invoke client is not configured. No AWS call was made.", [])
-        response = self.invoker.invoke(
-            FunctionName=ALLOWED_FUNCTION_ARN,
-            InvocationType="RequestResponse",
-            Payload=json.dumps(event).encode("utf-8"),
-        )
-        raw = response["Payload"].read()
+        try:
+            response = self.invoker.invoke(
+                FunctionName=ALLOWED_FUNCTION_ARN,
+                InvocationType="RequestResponse",
+                Payload=json.dumps(event).encode("utf-8"),
+            )
+        except Exception as exc:
+            raise Conflict("Renderer invoke failed. No tile was returned.", []) from exc
+        if response.get("FunctionError"):
+            raise Conflict("Renderer function returned an error. No tile was returned.", [])
+        payload = response.get("Payload")
+        raw = payload.read() if hasattr(payload, "read") else payload
+        if not isinstance(raw, (bytes, bytearray)):
+            raw = str(raw or "").encode("utf-8")
         if len(raw) > MAX_DECODED + 10_000:
             raise ValidationFailed("Renderer payload exceeds the size limit.", [])
         return json.loads(raw.decode("utf-8"))
