@@ -1,0 +1,122 @@
+{
+  "schema_note": "SYNTHETIC FIXTURES. Not the live tile inventory. Not read from S3. No production bucket paths.",
+  "layers": [
+    {
+      "tag": "demo/water_freq/y2025",
+      "title": "Synthetic water frequency",
+      "status": "published",
+      "backend": "png-pyramid",
+      "pyramid": {
+        "layout": "version-2-tiles",
+        "tile_pixel_size": 256,
+        "tile_merge": 8,
+        "min_static_level": 3,
+        "min_dynamic_level": 5,
+        "processed_levels": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        "version": 2.0,
+        "aggregate": "mean",
+        "persistent": true
+      },
+      "cog": null,
+      "bounds": {
+        "crs": "EPSG:3857",
+        "minx": -13600000,
+        "miny": 4500000,
+        "maxx": -13400000,
+        "maxy": 4700000
+      },
+      "style": {
+        "type": "color-ramp",
+        "stops": [
+          {"value": 0, "rgba": [255, 255, 255, 0], "label": "none"},
+          {"value": 50, "rgba": [70, 130, 180, 255], "label": "occasional"},
+          {"value": 100, "rgba": [0, 60, 120, 255], "label": "persistent"}
+        ]
+      },
+      "nodata": {
+        "min_value": 0,
+        "max_value": 100,
+        "fill_nodata": null,
+        "raster_nodata": null
+      },
+      "source_revisions": [
+        {
+          "revision_id": "fixture-1",
+          "uri": "synthetic://fixture/demo/water_freq/y2025",
+          "note": "Synthetic fixture source. Not an object in the tile bucket.",
+          "recorded_at": "2026-01-15T00:00:00Z"
+        }
+      ],
+      "authorized_tile_template": null
+    },
+    {
+      "tag": "demo/canopy_cover/cog",
+      "title": "Synthetic canopy cover COG",
+      "status": "published",
+      "backend": "cog",
+      "pyramid": null,
+      "cog": {
+        "block_size": [512, 512],
+        "overview_levels": [2, 4, 8],
+        "href_note": "Reference only. The registry does not fetch or rewrite the COG."
+      },
+      "bounds": {
+        "crs": "EPSG:3857",
+        "minx": -12000000,
+        "miny": 3500000,
+        "maxx": -11000000,
+        "maxy": 4500000
+      },
+      "style": {
+        "type": "color-ramp",
+        "stops": [
+          {"value": 0, "rgba": [237, 228, 203, 255], "label": "open"},
+          {"value": 100, "rgba": [27, 94, 55, 255], "label": "closed canopy"}
+        ]
+      },
+      "nodata": {
+        "min_value": 0,
+        "max_value": 100,
+        "fill_nodata": null,
+        "raster_nodata": 255
+      },
+      "source_revisions": [
+        {
+          "revision_id": "fixture-cog-1",
+          "uri": "synthetic://fixture/demo/canopy_cover/cog",
+          "note": "Synthetic COG reference. The legacy server will not read it.",
+          "recorded_at": "2026-02-02T00:00:00Z"
+        }
+      ],
+      "authorized_tile_template": null
+    },
+    {
+      "tag": "demo/slope/draft",
+      "title": "Synthetic slope draft",
+      "status": "draft",
+      "backend": "png-pyramid",
+      "pyramid": {
+        "layout": "version-2-tiles",
+        "tile_pixel_size": 256,
+        "tile_merge": 1,
+        "min_static_level": 3,
+        "min_dynamic_level": null,
+        "processed_levels": [],
+        "version": 2.0,
+        "aggregate": "median",
+        "persistent": true
+      },
+      "cog": null,
+      "bounds": null,
+      "style": {"type": "color-ramp", "stops": []},
+      "nodata": {
+        "min_value": null,
+        "max_value": null,
+        "fill_nodata": null,
+        "raster_nodata": null
+      },
+      "source_revisions": [],
+      "authorized_tile_template": null
+    }
+  ]
+}

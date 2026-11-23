@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Private artifact bucket for the geo-map layer-manager staging stack.
+  Account 544020760996, us-west-2 only. This bucket is not a tile bucket
+  and is not admin.terrapulse.com. It stores Lambda zip files until the
+  parent deletes the stack.
+
+Rules:
+  AuthorizedTarget:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::AccountId", "544020760996"]
+        AssertDescription: Deploy only in terraPulse account 544020760996 using profile mfeng. Do not use profile 6g.
+      - Assert: !Equals [!Ref "AWS::Region", "us-west-2"]
+        AssertDescription: Deploy only in us-west-2 (Oregon).
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: geo-map-layer-manager
+    AllowedPattern: "^geo-map-layer-manager$"
+  Stage:
+    Type: String
+    Default: staging
+    AllowedValues: [staging]
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Stage}-artifacts-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: abort-multipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      Tags:
+        - Key: Project
+          Value: geo-map-layer-manager
+        - Key: Stage
+          Value: staging
+        - Key: ManagedBy
+          Value: cloudformation
+
+  ArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt ArtifactBucket.Arn
+              - !Sub "${ArtifactBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+Outputs:
+  ArtifactBucketName:
+    Description: Pass this name to the main stack ArtifactBucketName parameter.
+    Value: !Ref ArtifactBucket
+  ArtifactBucketArn:
+    Value: !GetAtt ArtifactBucket.Arn
+  AccountId:
+    Value: !Ref AWS::AccountId
+  Region:
+    Value: !Ref AWS::Region

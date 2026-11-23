@@ -1,0 +1,606 @@
+(function () {
+  const main = document.getElementById("main");
+  const live = document.getElementById("live");
+  const authSlot = document.getElementById("auth-slot");
+  const config = window.LAYER_MANAGER_CONFIG;
+
+  function el(tag, attrs) {
+    const node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (key) {
+      if (key === "text") node.textContent = attrs[key];
+      else if (key === "className") node.className = attrs[key];
+      else node.setAttribute(key, attrs[key]);
+    });
+    for (let i = 2; i < arguments.length; i += 1) {
+      const child = arguments[i];
+      if (child == null) continue;
+      node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+    }
+    return node;
+  }
+
+  function say(text) {
+    live.textContent = text;
+  }
+
+  if (!config || !config.authMode) {
+    main.textContent = "";
+    main.appendChild(el("section", { className: "panel gate" },
+      el("h2", { text: "Console is not configured" }),
+      el("p", { text: "config.js is missing. This page has no embedded layer inventory and will not call the registry." })
+    ));
+    return;
+  }
+
+  const storageKey = "geoMapLayerManagerActor";
+  const tokenKey = "geoMapLayerManagerToken";
+  let actor = null;
+  let layers = [];
+  let selected = null;
+  let statusNote = "";
+
+  function apiBase() {
+    return (config.apiBase || "").replace(/\/$/, "");
+  }
+
+  function authHeaders() {
+    const headers = { "content-type": "application/json" };
+    if (config.authMode === "local-fixture") {
+      const name = sessionStorage.getItem(storageKey);
+      if (name) headers["x-layer-manager-fixture-actor"] = name;
+    } else {
+      const token = sessionStorage.getItem(tokenKey);
+      if (token) headers.authorization = "Bearer " + token;
+    }
+    return headers;
+  }
+
+  async function api(method, path, body) {
+    const response = await fetch(apiBase() + path, {
+      method: method,
+      headers: authHeaders(),
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.ok === false) {
+      const error = new Error((payload.error && payload.error.message) || "Request failed");
+      error.payload = payload;
+      error.status = response.status;
+      throw error;
+    }
+    return payload.result;
+  }
+
+  function signedIn() {
+    if (config.authMode === "local-fixture") return Boolean(sessionStorage.getItem(storageKey));
+    return Boolean(sessionStorage.getItem(tokenKey));
+  }
+
+  function renderAuth() {
+    authSlot.textContent = "";
+    if (!signedIn()) {
+      authSlot.appendChild(el("span", { className: "note", text: "Not signed in" }));
+      return;
+    }
+    const label = actor ? actor.role + (actor.synthetic_identity ? " · fixture" : "") : "signed in";
+    authSlot.appendChild(el("span", { className: "note", text: label }));
+    const button = el("button", { className: "secondary", type: "button", text: "Sign out" });
+    button.style.marginLeft = "0.5rem";
+    button.addEventListener("click", function () {
+      sessionStorage.removeItem(storageKey);
+      sessionStorage.removeItem(tokenKey);
+      actor = null;
+      location.hash = "#/layers";
+      render();
+    });
+    authSlot.appendChild(button);
+  }
+
+  function renderGate() {
+    main.textContent = "";
+    const section = el("section", { className: "panel gate" },
+      el("h2", { text: "Admin sign-in" }),
+      el("p", { text: "There is no open signup. The staging pool starts empty and creates users only when an administrator enrolls a confirmed identity." })
+    );
+    if (config.authMode === "local-fixture") {
+      section.appendChild(el("p", { text: "This local process accepts two labeled fixture identities. They are not staging credentials." }));
+      const actions = el("div", { className: "actions" });
+      ["fixture-admin", "fixture-reader"].forEach(function (name) {
+        const button = el("button", { type: "button", text: "Continue as " + name });
+        if (name === "fixture-reader") button.className = "secondary";
+        button.addEventListener("click", function () {
+          sessionStorage.setItem(storageKey, name);
+          bootSession();
+        });
+        actions.appendChild(button);
+      });
+      section.appendChild(actions);
+    } else if (config.cognito && config.cognito.clientId) {
+      const button = el("button", { type: "button", text: "Continue with Cognito" });
+      button.addEventListener("click", startHostedUi);
+      section.appendChild(el("div", { className: "actions" }, button));
+    } else {
+      section.appendChild(el("p", { text: "Cognito is not configured in config.js. The console will not invent an identity." }));
+    }
+    main.appendChild(section);
+  }
+
+  async function startHostedUi() {
+    const verifier = window.LayerManagerAuth.randomVerifier();
+    const challenge = await window.LayerManagerAuth.challengeS256(verifier);
+    const state = window.LayerManagerAuth.randomVerifier();
+    sessionStorage.setItem("geoMapPkceVerifier", verifier);
+    sessionStorage.setItem("geoMapPkceState", state);
+    location.assign(window.LayerManagerAuth.hostedUiUrl(config.cognito, config.cognito.redirectUri, state, challenge));
+  }
+
+  async function finishHostedUi() {
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+    if (!code || config.authMode !== "apigateway-cognito") return;
+    const state = params.get("state");
+    if (!state || state !== sessionStorage.getItem("geoMapPkceState")) {
+      say("Sign-in state did not match. No token was stored.");
+      return;
+    }
+    const verifier = sessionStorage.getItem("geoMapPkceVerifier");
+    const body = new URLSearchParams();
+    body.set("grant_type", "authorization_code");
+    body.set("client_id", config.cognito.clientId);
+    body.set("code", code);
+    body.set("redirect_uri", config.cognito.redirectUri);
+    body.set("code_verifier", verifier);
+    const response = await fetch(config.cognito.hostedUiBase + "/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: body.toString()
+    });
+    if (!response.ok) {
+      say("Cognito did not return a token.");
+      return;
+    }
+    const token = await response.json();
+    sessionStorage.setItem(tokenKey, token.access_token);
+    history.replaceState({}, "", location.pathname);
+  }
+
+  function route() {
+    const hash = location.hash || "#/layers";
+    const parts = hash.replace(/^#\//, "").split("/");
+    if (parts[0] === "register") return { name: "register" };
+    if (parts[0] === "import") return { name: "import" };
+    if (parts[0] === "layers" && parts.length > 1) {
+      return { name: "detail", tag: decodeURIComponent(parts.slice(1).join("/")) };
+    }
+    return { name: "layers" };
+  }
+
+  async function render() {
+    renderAuth();
+    if (!signedIn()) {
+      renderGate();
+      return;
+    }
+    const current = route();
+    if (current.name === "register") return renderRegister();
+    if (current.name === "import") return renderImport();
+    if (current.name === "detail") return renderDetail(current.tag);
+    return renderList();
+  }
+
+  async function renderList() {
+    main.textContent = "";
+    const search = el("input", { id: "layer-search", type: "search" });
+    search.addEventListener("input", function () { loadList(search.value); });
+    const list = el("ul", { id: "layer-list", className: "layer-list" });
+    const side = el("section", { className: "panel", "aria-label": "Layer list" },
+      el("h2", { text: "Layers" }),
+      el("label", { for: "layer-search", text: "Search layers" }),
+      search,
+      list
+    );
+    const detail = el("section", { id: "detail", className: "panel detail" },
+      el("h2", { text: "Select a layer" }),
+      el("p", { className: "note", text: "Choose a row to inspect zooms, block size, bounds, style, nodata, sources, and validation." })
+    );
+    const actions = el("div", { className: "actions" });
+    if (!actor || actor.role === "layer-admin") {
+      actions.appendChild(linkButton("Register a layer", "#/register"));
+      actions.appendChild(linkButton("Import legacy metadata", "#/import", true));
+    }
+    side.appendChild(actions);
+    main.appendChild(el("div", { className: "layout" }, side, detail));
+    await loadList("");
+    search.focus();
+  }
+
+  function linkButton(text, href, secondary) {
+    const node = el("a", { className: secondary ? "button secondary" : "button", href: href, text: text });
+    return node;
+  }
+
+  async function loadList(query) {
+    const list = document.getElementById("layer-list");
+    if (!list) return;
+    const result = await api("GET", "/v1/layers?q=" + encodeURIComponent(query || ""));
+    layers = result.layers;
+    const fixture = document.getElementById("fixture-banner");
+    fixture.textContent = result.inventory_note + (statusNote ? " " + statusNote : "");
+    list.textContent = "";
+    if (!layers.length) {
+      list.appendChild(el("li", { text: "No layers match this registry query." }));
+      return;
+    }
+    layers.forEach(function (layer) {
+      const button = el("button", { type: "button" });
+      button.appendChild(el("div", { className: "tag", text: layer.tag }));
+      button.appendChild(el("div", { text: layer.title }));
+      button.appendChild(chips(layer));
+      button.addEventListener("click", function () {
+        location.hash = "#/layers/" + encodeURIComponent(layer.tag);
+      });
+      list.appendChild(el("li", {}, button));
+    });
+  }
+
+  function chips(layer) {
+    const row = el("div", { className: "chips" });
+    row.appendChild(el("span", { className: "chip", text: layer.backend }));
+    row.appendChild(el("span", { className: "chip " + layer.status, text: layer.status }));
+    if (layer.synthetic) row.appendChild(el("span", { className: "chip synthetic", text: "Synthetic fixture" }));
+    return row;
+  }
+
+  async function renderDetail(tag) {
+    main.textContent = "";
+    let result;
+    try {
+      result = await api("GET", "/v1/layers/item?tag=" + encodeURIComponent(tag));
+    } catch (error) {
+      main.appendChild(el("section", { className: "panel" }, el("h2", { text: "Layer not found" }), el("p", { text: error.message })));
+      return;
+    }
+    selected = result.layer;
+    const back = el("p", {}, el("a", { href: "#/layers", text: "Back to layers" }));
+    const head = el("section", { className: "panel detail" },
+      back,
+      el("p", { className: "eyebrow", text: selected.synthetic ? "Synthetic fixture" : "Registry record" }),
+      el("h2", { id: "layer-title", tabindex: "-1", text: selected.title }),
+      el("p", { className: "tag", text: selected.tag }),
+      chips(selected),
+      el("p", { text: "Revision " + selected.revision + ". Updated " + selected.updated_at + " by " + selected.updated_by + "." })
+    );
+    head.appendChild(metaTable(selected));
+    head.appendChild(ramp(selected));
+    head.appendChild(issues(selected));
+    head.appendChild(sources(selected));
+    head.appendChild(el("h3", { text: "Tile backend preview address" }));
+    head.appendChild(el("p", { text: result.preview.reason }));
+    if (result.preview.tile_backend) {
+      head.appendChild(el("p", { className: "note", text: result.preview.tile_backend.integration_status + ". " + result.preview.tile_backend.note }));
+    }
+    if (result.preview.template) {
+      head.appendChild(el("p", { className: "tag", text: result.preview.template }));
+      head.appendChild(el("p", { className: "note", text: "Shown as text only. The admin token is not sent to the tile backend, and publishing does not generate tiles." }));
+    }
+    if (actor && actor.role === "layer-admin") {
+      head.appendChild(editForm(selected));
+      if (selected.status === "draft") head.appendChild(publishForm(selected));
+    }
+    head.appendChild(exportForm(selected.tag));
+    head.appendChild(await auditBlock(selected.tag));
+    main.appendChild(head);
+    document.getElementById("layer-title").focus();
+    say("Showing " + selected.tag);
+  }
+
+  function metaTable(layer) {
+    const pyramid = layer.pyramid || {};
+    const cog = layer.cog || {};
+    const bounds = layer.bounds;
+    const rows = [
+      ["Backend", layer.backend],
+      ["PNG layout", pyramid.layout || "—"],
+      ["Zooms", (pyramid.processed_levels || []).join(", ") || "none recorded"],
+      ["Tile pixels", pyramid.tile_pixel_size == null ? "—" : String(pyramid.tile_pixel_size)],
+      ["Tile merge / block", pyramid.tile_merge == null ? "—" : String(pyramid.tile_merge)],
+      ["COG block size", cog.block_size ? cog.block_size.join(" × ") : "—"],
+      ["COG overviews", (cog.overview_levels || []).join(", ") || "—"],
+      ["Bounds", bounds ? bounds.crs + " " + bounds.minx + ", " + bounds.miny + " / " + bounds.maxx + ", " + bounds.maxy : "not set"],
+      ["Nodata min / max", formatPair(layer.nodata.min_value, layer.nodata.max_value)],
+      ["Fill nodata / raster", formatPair(layer.nodata.fill_nodata, layer.nodata.raster_nodata)]
+    ];
+    const table = el("table");
+    rows.forEach(function (row) {
+      table.appendChild(el("tr", {}, el("th", { scope: "row", text: row[0] }), el("td", { text: row[1] })));
+    });
+    return el("div", {}, el("h3", { text: "Pyramid, COG, bounds, nodata" }), table);
+  }
+
+  function formatPair(a, b) {
+    return (a == null ? "—" : String(a)) + " / " + (b == null ? "—" : String(b));
+  }
+
+  function ramp(layer) {
+    const stops = (layer.style && layer.style.stops) || [];
+    const bar = el("div", { className: "ramp", role: "img", "aria-label": "Color ramp" });
+    if (!stops.length) return el("div", {}, el("h3", { text: "Style" }), el("p", { text: "No color stops yet." }));
+    stops.forEach(function (stop) {
+      const color = "rgba(" + stop.rgba.join(",") + ")";
+      const swatch = el("span", { title: String(stop.value) });
+      swatch.style.background = color;
+      bar.appendChild(swatch);
+    });
+    return el("div", {}, el("h3", { text: "Style" }), bar);
+  }
+
+  function issues(layer) {
+    const box = el("div", {}, el("h3", { text: "Validation" }));
+    const validation = layer.validation;
+    const list = el("ul", { className: "issues" });
+    validation.errors.concat(validation.publish_blockers).forEach(function (item) {
+      list.appendChild(el("li", { className: "error", text: item.field + ": " + item.message }));
+    });
+    validation.warnings.forEach(function (item) {
+      list.appendChild(el("li", { className: "warning", text: item.field + ": " + item.message }));
+    });
+    if (!list.childNodes.length) list.appendChild(el("li", { text: "No validation issues." }));
+    box.appendChild(list);
+    return box;
+  }
+
+  function sources(layer) {
+    const box = el("div", {}, el("h3", { text: "Source revisions" }));
+    if (!layer.source_revisions.length) {
+      box.appendChild(el("p", { text: "No source revisions recorded." }));
+      return box;
+    }
+    const list = el("ul", {});
+    layer.source_revisions.forEach(function (source) {
+      list.appendChild(el("li", {}, el("span", { className: "tag", text: source.uri }), " — " + source.note + " (" + source.recorded_at + ")"));
+    });
+    box.appendChild(list);
+    return box;
+  }
+
+  function editForm(layer) {
+    const form = el("form", {}, el("h3", { text: "Edit metadata" }));
+    const title = field(form, "Title", "edit-title", layer.title);
+    form.appendChild(el("p", { className: "note", text: "Saving writes a new registry revision. It does not regenerate PNGs." }));
+    const button = el("button", { type: "submit", text: "Save registry revision" });
+    form.appendChild(el("div", { className: "actions" }, button));
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const body = {
+        tag: layer.tag,
+        expected_revision: layer.revision,
+        layer: { title: title.value }
+      };
+      try {
+        const result = await api("PATCH", "/v1/layers/item?tag=" + encodeURIComponent(layer.tag), body);
+        say(result.effects.png_pyramid_regenerated ? "Unexpected tile write" : "Saved revision " + result.layer.revision + ". PNG pyramids were not regenerated.");
+        renderDetail(layer.tag);
+      } catch (error) {
+        say(error.message);
+      }
+    });
+    return form;
+  }
+
+  function publishForm(layer) {
+    const form = el("form", {}, el("h3", { text: "Publish registry record" }));
+    form.appendChild(el("p", { text: "Publishing marks this draft in the registry. Existing PNG pyramids are not regenerated." }));
+    const phrase = field(form, "Type publish-registry-only to confirm", "publish-phrase", "");
+    const button = el("button", { type: "submit", text: "Publish registry record" });
+    form.appendChild(el("div", { className: "actions" }, button));
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      try {
+        const result = await api("POST", "/v1/layers/item/publish?tag=" + encodeURIComponent(layer.tag), {
+          tag: layer.tag,
+          expected_revision: layer.revision,
+          confirmation: phrase.value.trim()
+        });
+        say("Published revision " + result.layer.revision + ". PNG pyramids were not regenerated.");
+        renderDetail(layer.tag);
+      } catch (error) {
+        say(error.message);
+      }
+    });
+    return form;
+  }
+
+  function exportForm(tag) {
+    const box = el("div", {}, el("h3", { text: "Legacy export" }));
+    box.appendChild(el("p", { className: "note", text: "Export returns setting.ini JSON and color.txt in the page. It does not write the tile repository." }));
+    const out = el("textarea", { id: "legacy-export", readonly: "readonly" });
+    const button = el("button", { type: "button", text: "Show legacy export" });
+    button.addEventListener("click", async function () {
+      try {
+        const result = await api("POST", "/v1/layers/export-legacy", { tag: tag });
+        out.value = JSON.stringify(result.setting, null, 2) + "\n\n" + result.color_txt;
+        say(result.written ? "Unexpected write" : "Export displayed. Nothing was written to the tile repository.");
+      } catch (error) {
+        say(error.message);
+      }
+    });
+    box.appendChild(el("div", { className: "actions" }, button));
+    box.appendChild(out);
+    return box;
+  }
+
+  async function auditBlock(tag) {
+    const result = await api("GET", "/v1/layers/audit?tag=" + encodeURIComponent(tag));
+    const box = el("div", {}, el("h3", { text: "Audit trail" }));
+    if (!result.audit.length) {
+      box.appendChild(el("p", { text: "No audit events." }));
+      return box;
+    }
+    const list = el("ul", {});
+    result.audit.forEach(function (event) {
+      list.appendChild(el("li", { text: event.action + " · revision " + event.to_revision + " · " + event.actor_sub + " · " + event.at }));
+    });
+    box.appendChild(list);
+    return box;
+  }
+
+  function renderRegister() {
+    main.textContent = "";
+    const form = el("form", { className: "panel" },
+      el("h2", { text: "Register a layer" }),
+      el("p", { className: "note", text: "Preview validates metadata and does not save it. Create stores a draft. Neither step generates tiles." })
+    );
+    const tag = field(form, "Tag", "reg-tag", "demo/example/y2026");
+    const title = field(form, "Title", "reg-title", "");
+    const backend = el("select", { id: "reg-backend" });
+    ["png-pyramid", "cog"].forEach(function (value) {
+      backend.appendChild(el("option", { value: value, text: value }));
+    });
+    form.appendChild(el("label", { for: "reg-backend", text: "Backend" }));
+    form.appendChild(backend);
+    const levels = field(form, "Processed zooms", "reg-levels", "3, 4, 5");
+    const merge = field(form, "Tile merge or COG block", "reg-merge", "1");
+    const preview = el("button", { type: "button", text: "Preview metadata" });
+    const create = el("button", { type: "submit", text: "Create draft", disabled: "disabled" });
+    const phrase = field(form, "Type create-draft to confirm", "reg-phrase", "");
+    const report = el("div", { id: "preview-report" });
+    form.appendChild(el("div", { className: "actions" }, preview, create));
+    form.appendChild(report);
+    let digest = null;
+    function draftLayer() {
+      const zooms = levels.value.split(/[^0-9]+/).filter(Boolean).map(Number);
+      const size = Number(merge.value || "1");
+      const png = backend.value === "png-pyramid";
+      return {
+        tag: tag.value.trim(),
+        title: title.value.trim(),
+        backend: backend.value,
+        pyramid: png ? {
+          layout: "version-2-tiles",
+          tile_pixel_size: 256,
+          tile_merge: size,
+          min_static_level: zooms.length ? zooms[0] : 3,
+          min_dynamic_level: zooms.length ? zooms[zooms.length - 1] : null,
+          processed_levels: zooms,
+          version: 2,
+          aggregate: "median",
+          persistent: true
+        } : null,
+        cog: png ? null : { block_size: [size, size], overview_levels: [2], href_note: "Reference only. The registry does not fetch or rewrite the COG." },
+        bounds: null,
+        style: { type: "color-ramp", stops: [] },
+        nodata: { min_value: null, max_value: null, fill_nodata: null, raster_nodata: null },
+        source_revisions: [],
+        authorized_tile_template: null
+      };
+    }
+    preview.addEventListener("click", async function () {
+      try {
+        const result = await api("POST", "/v1/layers/preview", { layer: draftLayer() });
+        digest = result.content_digest;
+        create.disabled = !digest;
+        report.textContent = "";
+        report.appendChild(el("h3", { text: "Preview" }));
+        report.appendChild(el("p", { text: result.persisted ? "Unexpected save" : "Not saved. PNG pyramids were not regenerated." }));
+        const list = el("ul", { className: "issues" });
+        const validation = result.validation;
+        validation.errors.concat(validation.publish_blockers, validation.warnings).forEach(function (item) {
+          list.appendChild(el("li", { className: item.severity === "warning" ? "warning" : "error", text: item.message }));
+        });
+        if (!list.childNodes.length) list.appendChild(el("li", { text: "No issues." }));
+        report.appendChild(list);
+        say("Preview ready. Nothing was saved.");
+      } catch (error) {
+        digest = null;
+        create.disabled = true;
+        say(error.message);
+      }
+    });
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      try {
+        const result = await api("POST", "/v1/layers", {
+          confirmation: phrase.value.trim(),
+          content_digest: digest,
+          layer: draftLayer()
+        });
+        say("Draft " + result.layer.tag + " saved at revision " + result.layer.revision + ". PNGs were not regenerated.");
+        location.hash = "#/layers/" + encodeURIComponent(result.layer.tag);
+      } catch (error) {
+        say(error.message);
+      }
+    });
+    main.appendChild(form);
+    title.focus();
+  }
+
+  function renderImport() {
+    main.textContent = "";
+    const form = el("form", { className: "panel" },
+      el("h2", { text: "Import legacy metadata" }),
+      el("p", { className: "note", text: "Paste setting.ini JSON and color.txt. Import creates a draft in this registry and does not write the tile repository. Existing tags are refused." })
+    );
+    const tag = field(form, "Tag", "import-tag", "");
+    const setting = area(form, "setting.ini JSON", "import-setting");
+    const color = area(form, "color.txt", "import-color");
+    const phrase = field(form, "Type import-legacy-draft to confirm", "import-phrase", "");
+    form.appendChild(el("div", { className: "actions" }, el("button", { type: "submit", text: "Import as draft" })));
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      try {
+        const parsed = JSON.parse(setting.value);
+        const result = await api("POST", "/v1/layers/import-legacy", {
+          tag: tag.value.trim(),
+          setting: parsed,
+          color_txt: color.value,
+          confirmation: phrase.value.trim()
+        });
+        say("Imported " + result.layer.tag + " as a draft. Legacy files were not written.");
+        location.hash = "#/layers/" + encodeURIComponent(result.layer.tag);
+      } catch (error) {
+        say(error.message);
+      }
+    });
+    main.appendChild(form);
+  }
+
+  function field(form, label, id, value) {
+    const input = el("input", { id: id, value: value });
+    form.appendChild(el("label", { for: id, text: label }));
+    form.appendChild(input);
+    return input;
+  }
+
+  function area(form, label, id) {
+    const input = el("textarea", { id: id });
+    form.appendChild(el("label", { for: id, text: label }));
+    form.appendChild(input);
+    return input;
+  }
+
+  async function bootSession() {
+    try {
+      const result = await api("GET", "/v1/session");
+      actor = result.actor;
+      const tileNote = result.tile_backend && result.tile_backend.note ? " " + result.tile_backend.note : "";
+      statusNote = result.effects_notice + tileNote;
+      document.getElementById("fixture-banner").textContent = result.banner + " " + statusNote;
+      say(result.banner);
+      render();
+    } catch (error) {
+      actor = null;
+      sessionStorage.removeItem(storageKey);
+      sessionStorage.removeItem(tokenKey);
+      say(error.message);
+      render();
+    }
+  }
+
+  window.addEventListener("hashchange", render);
+  const params = new URLSearchParams(location.search);
+  if (config.authMode === "local-fixture" && params.get("autologin") === "1") {
+    sessionStorage.setItem(storageKey, "fixture-admin");
+  }
+  finishHostedUi().then(bootSession);
+})();

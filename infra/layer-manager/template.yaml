@@ -1,0 +1,566 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        # dynamodb:TransactWriteItems is a real IAM action. This cfn-lint
+        # build's IAM vocabulary omits it.
+        - W3037
+Description: >
+  Isolated staging registry and admin console for geo-map layer metadata.
+  Account 544020760996 and us-west-2 only. Private S3 and CloudFront default
+  domain, HTTP API, Lambda, DynamoDB, and an empty Cognito pool. Does not
+  create DNS records, does not change admin.terrapulse.com, and does not
+  read or write production tile buckets. The tile-backend base URL is empty
+  until the parent supplies a test endpoint.
+
+Rules:
+  AuthorizedTarget:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::AccountId", "544020760996"]
+        AssertDescription: Deploy only in terraPulse account 544020760996 with profile mfeng. Do not use profile 6g.
+      - Assert: !Equals [!Ref "AWS::Region", "us-west-2"]
+        AssertDescription: Deploy only in us-west-2 (Oregon).
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: geo-map-layer-manager
+    AllowedPattern: "^geo-map-layer-manager$"
+  Stage:
+    Type: String
+    Default: staging
+    AllowedValues: [staging]
+  ArtifactBucketName:
+    Type: String
+    Default: geo-map-layer-manager-staging-artifacts-544020760996
+    AllowedPattern: "^geo-map-layer-manager-staging-artifacts-544020760996$"
+    Description: Bootstrap stack output. This is not a tile bucket.
+  ArtifactKey:
+    Type: String
+    AllowedPattern: "^lambda/[A-Za-z0-9._/-]+\\.zip$"
+    Description: Key of the packaged Lambda zip in the artifact bucket. No default, so the stack cannot be created before the zip is uploaded.
+  CognitoDomainPrefix:
+    Type: String
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{2,40}$"
+    Description: Globally unique hosted-UI prefix. Suggested tp-geomap-layers-544020760996. No users are created.
+  ReservedConcurrentExecutions:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+  EnablePitr:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+  SeedSyntheticFixtures:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Insert labeled synthetic fixtures when missing. Does not overwrite and does not read production metadata.
+  PreviewAllowedHosts:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^https://[A-Za-z0-9.-]+(:[0-9]+)?(,https://[A-Za-z0-9.-]+(:[0-9]+)?){0,7}$"
+    Description: Extra https origins whose stored tile templates may be displayed. Empty by default. The browser does not request them.
+  TileBackendBaseUrl:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$"
+    Description: >
+      Optional base URL for the isolated performance-branch test API.
+      Leave empty until that endpoint exists. Do not use admin.terrapulse.com,
+      a geo-map-tiles bucket, or map-tiles-dev. This stack never calls the URL.
+  TilePathOrder:
+    Type: String
+    Default: map
+    AllowedValues: [map, zx_y, zxy, xyz]
+    Description: Historical tile path used only to compose a preview address.
+
+Conditions:
+  UsePitr: !Equals [!Ref EnablePitr, "true"]
+
+Resources:
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Stage}-frontend-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      Tags:
+        - Key: Project
+          Value: geo-map-layer-manager
+        - Key: Stage
+          Value: staging
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${ProjectName}-${Stage}-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${ProjectName}-${Stage}-headers"
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: !Sub
+              - "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://${Prefix}.auth.${AWS::Region}.amazoncognito.com https://*.execute-api.${AWS::Region}.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://${Prefix}.auth.${AWS::Region}.amazoncognito.com; object-src 'none'"
+              - Prefix: !Ref CognitoDomainPrefix
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: no-referrer
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Override: true
+            Preload: false
+
+  StaticCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${ProjectName}-${Stage}-static"
+        DefaultTTL: 3600
+        MaxTTL: 86400
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingGzip: true
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  ConfigCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "${ProjectName}-${Stage}-config"
+        DefaultTTL: 0
+        MaxTTL: 0
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingGzip: false
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "${ProjectName}-${Stage} private console"
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: site
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: !Ref StaticCachePolicy
+          ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+        CacheBehaviors:
+          - PathPattern: config.js
+            TargetOriginId: site
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
+            CachePolicyId: !Ref ConfigCachePolicy
+            ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt FrontendBucket.Arn
+              - !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+
+  RegistryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TableName: !Sub "${ProjectName}-${Stage}-registry-${AWS::AccountId}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [UsePitr, true, false]
+      DeletionProtectionEnabled: false
+      Tags:
+        - Key: Project
+          Value: geo-map-layer-manager
+        - Key: Stage
+          Value: staging
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${ProjectName}-${Stage}"
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: "ON"
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
+      DeletionProtection: INACTIVE
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub "${ProjectName}-${Stage}-spa"
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs:
+        - !Sub "https://${Distribution.DomainName}/"
+      LogoutURLs:
+        - !Sub "https://${Distribution.DomainName}/"
+      SupportedIdentityProviders: [COGNITO]
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref UserPool
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: layer-admin
+      Description: Registry editors. Assigned by an administrator. The pool starts empty.
+      Precedence: 1
+      UserPoolId: !Ref UserPool
+
+  ReaderGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: layer-reader
+      Description: Registry readers. Assigned by an administrator. The pool starts empty.
+      Precedence: 2
+      UserPoolId: !Ref UserPool
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-${Stage}-api"
+      RetentionInDays: 14
+
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${ProjectName}-${Stage}"
+      RetentionInDays: 14
+
+  ApiAccessLogPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub "${ProjectName}-${Stage}-api-logs"
+      PolicyDocument: !Sub
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {"Service": "apigateway.amazonaws.com"},
+                "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+                "Resource": "${LogArn}:*"
+              }
+            ]
+          }
+        - LogArn: !GetAtt ApiAccessLogGroup.Arn
+
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: registry-staging
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: RegistryItems
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:TransactWriteItems
+                  - dynamodb:ConditionCheckItem
+                Resource: !GetAtt RegistryTable.Arn
+              - Sid: WriteOwnLogStreams
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${ApiLogGroup.Arn}:*"
+      Tags:
+        - Key: Project
+          Value: geo-map-layer-manager
+        - Key: Stage
+          Value: staging
+
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Stage}-api"
+      Runtime: python3.12
+      Architectures: [arm64]
+      Handler: layer_manager_lambda.handler
+      Timeout: 15
+      MemorySize: 256
+      ReservedConcurrentExecutions: !Ref ReservedConcurrentExecutions
+      Role: !GetAtt ApiRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ApiLogGroup
+      Code:
+        S3Bucket: !Ref ArtifactBucketName
+        S3Key: !Ref ArtifactKey
+      Environment:
+        Variables:
+          LAYER_MANAGER_ENV: staging
+          LAYER_MANAGER_AUTH_MODE: apigateway-cognito
+          LAYER_MANAGER_REPOSITORY: dynamodb
+          LAYER_MANAGER_DYNAMODB_TABLE: !Ref RegistryTable
+          LAYER_MANAGER_DYNAMODB_REGION: !Ref AWS::Region
+          LAYER_MANAGER_COGNITO_REGION: !Ref AWS::Region
+          LAYER_MANAGER_COGNITO_USER_POOL_ID: !Ref UserPool
+          LAYER_MANAGER_COGNITO_CLIENT_ID: !Ref UserPoolClient
+          LAYER_MANAGER_SEED_FIXTURES: "0"
+          LAYER_MANAGER_ALLOW_FIXTURE_AUTH: "0"
+          LAYER_MANAGER_EMIT_CORS: "0"
+          LAYER_MANAGER_PREVIEW_HOSTS: !Ref PreviewAllowedHosts
+          LAYER_MANAGER_CORS_ORIGINS: !Sub "https://${Distribution.DomainName}"
+          LAYER_MANAGER_TILE_BACKEND_BASE_URL: !Ref TileBackendBaseUrl
+          LAYER_MANAGER_TILE_PATH_ORDER: !Ref TilePathOrder
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${ProjectName}-${Stage}"
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - !Sub "https://${Distribution.DomainName}"
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        AllowHeaders: [authorization, content-type]
+        MaxAge: 600
+        AllowCredentials: false
+
+  ApiAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref HttpApi
+      AuthorizerType: JWT
+      Name: cognito-staging
+      IdentitySource:
+        - $request.header.Authorization
+      JwtConfiguration:
+        Audience:
+          - !Ref UserPoolClient
+        Issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+
+  ApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: "2.0"
+      TimeoutInMillis: 10000
+
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "ANY /v1/{proxy+}"
+      AuthorizationType: JWT
+      AuthorizerId: !Ref ApiAuthorizer
+      Target: !Sub "integrations/${ApiIntegration}"
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","route":"$context.routeKey","status":"$context.status","authorizerError":"$context.authorizer.error"}'
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*"
+
+  SeedInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: cloudformation.amazonaws.com
+      SourceArn: !Ref AWS::StackId
+
+  SyntheticSeed:
+    Type: Custom::SyntheticSeed
+    DependsOn: SeedInvokePermission
+    Properties:
+      ServiceToken: !GetAtt ApiFunction.Arn
+      SeedSyntheticFixtures: !Ref SeedSyntheticFixtures
+      SchemaId: geo-map.layer-registry.v1
+
+Outputs:
+  DistributionDomainName:
+    Value: !GetAtt Distribution.DomainName
+  DistributionId:
+    Value: !Ref Distribution
+  ConsoleUrl:
+    Value: !Sub "https://${Distribution.DomainName}/"
+  HttpApiEndpoint:
+    Value: !GetAtt HttpApi.ApiEndpoint
+  HttpApiId:
+    Value: !Ref HttpApi
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  RegistryTableName:
+    Value: !Ref RegistryTable
+  ApiRoleArn:
+    Value: !GetAtt ApiRole.Arn
+  ApiFunctionArn:
+    Value: !GetAtt ApiFunction.Arn
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  UserPoolDomain:
+    Value: !Ref UserPoolDomain
+  HostedUiBaseUrl:
+    Value: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+  ApiLogGroupName:
+    Value: !Ref ApiLogGroup
+  ApiAccessLogGroupName:
+    Value: !Ref ApiAccessLogGroup
+  SeedInserted:
+    Value: !GetAtt SyntheticSeed.Inserted
+  TileBackendBaseUrl:
+    Value: !Ref TileBackendBaseUrl
+  TilePathOrder:
+    Value: !Ref TilePathOrder
+  TileBackendIntegration:
+    Value: address-only-or-unset
+    Description: This stack does not call the tile backend and does not claim it is integrated.
