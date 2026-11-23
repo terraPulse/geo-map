@@ -54,6 +54,7 @@ class BuildTests(unittest.TestCase):
 
     def test_oversized_plan_is_not_queued(self):
         settings = fixture_settings()
+        settings.build_absolute_max = 4
         builds = BuildService(MemoryBuildStore(), settings, LayerService(MemoryRepository()), "/tmp")
         plan = builds.plan({
             "source_id": "fixture-demo",
@@ -62,7 +63,7 @@ class BuildTests(unittest.TestCase):
             "tile_merge": 1,
         })
         self.assertFalse(plan["accepted"])
-        self.assertIn("tile cap", plan["reason"])
+        self.assertIn("absolute tile budget", plan["reason"])
         with self.assertRaises(Exception):
             builds.submit({
                 "source_id": "fixture-demo",

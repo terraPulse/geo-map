@@ -44,6 +44,9 @@ class Settings:
         source_allowlist="",
         output_prefix="builds",
         max_build_tiles=32,
+        build_absolute_max=4096,
+        orchestrator="in-process",
+        build_queue_url="",
         renderer_mode="disabled",
         renderer_function_arn="",
         seed_fixtures,
@@ -67,9 +70,13 @@ class Settings:
         self.tile_path_order = tile_path_order or "map"
         self.builds_enabled = bool(builds_enabled)
         self.build_executor = build_executor or "disabled"
+        self.source_allowlist_text = source_allowlist if isinstance(source_allowlist, str) else ""
         self.source_allowlist = parse_source_allowlist(source_allowlist)
         self.output_prefix = output_prefix or "builds"
         self.max_build_tiles = int(max_build_tiles)
+        self.build_absolute_max = int(build_absolute_max)
+        self.orchestrator = orchestrator or "in-process"
+        self.build_queue_url = build_queue_url or ""
         self.renderer_mode = renderer_mode or "disabled"
         self.renderer_function_arn = renderer_function_arn or ""
         self.seed_fixtures = seed_fixtures
@@ -117,12 +124,16 @@ class Settings:
             raise ConfigurationError("Tile path order must be map, zx_y, zxy, or xyz.")
         if self.tile_backend_base_url:
             validate_tile_backend_base(self.tile_backend_base_url)
-        if self.build_executor not in {"disabled", "fixture-offline", "gio"}:
+        if self.build_executor not in {"disabled", "fixture-offline", "gio", "rasterio"}:
             raise ConfigurationError("Build executor is not recognized.")
+        if self.orchestrator not in {"in-process", "batch"}:
+            raise ConfigurationError("Build orchestrator is not recognized.")
         if self.renderer_mode not in {"disabled", "fixture-offline", "lambda"}:
             raise ConfigurationError("Renderer mode is not recognized.")
-        if self.env == "staging" and self.build_executor == "fixture-offline":
-            raise ConfigurationError("Staging does not run fixture builds.")
+        if self.env == "staging" and self.build_executor not in {"disabled", "rasterio"}:
+            raise ConfigurationError("The staging API does not run the raster worker.")
+        if self.env == "staging" and self.build_executor == "rasterio" and self.orchestrator != "batch":
+            raise ConfigurationError("Staging may enqueue Batch work. It does not run the raster worker in the API.")
         if self.env == "staging" and self.renderer_mode == "fixture-offline":
             raise ConfigurationError("Staging does not use the offline renderer fixture.")
         if self.renderer_mode == "lambda":
@@ -179,6 +190,9 @@ class Settings:
             source_allowlist=env.get("LAYER_MANAGER_SOURCE_ALLOWLIST", ""),
             output_prefix=env.get("LAYER_MANAGER_OUTPUT_PREFIX", "builds") or "builds",
             max_build_tiles=int(env.get("LAYER_MANAGER_MAX_BUILD_TILES", "32") or "32"),
+            build_absolute_max=int(env.get("LAYER_MANAGER_BUILD_ABSOLUTE_MAX", "4096") or "4096"),
+            orchestrator=env.get("LAYER_MANAGER_ORCHESTRATOR", "in-process") or "in-process",
+            build_queue_url=env.get("LAYER_MANAGER_BUILD_QUEUE_URL", ""),
             renderer_mode=env.get("LAYER_MANAGER_RENDERER_MODE", "disabled") or "disabled",
             renderer_function_arn=env.get("LAYER_MANAGER_RENDERER_FUNCTION_ARN", ""),
             seed_fixtures=_flag(env, "LAYER_MANAGER_SEED_FIXTURES", seed_default),

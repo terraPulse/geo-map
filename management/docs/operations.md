@@ -70,7 +70,7 @@ aws cloudformation deploy \
   --no-execute-changeset
 ```
 
-Check the changeset for these absences: Route 53, `admin.terrapulse.com`, `geo-map-tiles`, a public bucket, an unauthenticated `/v1` route, and a Cognito user. Then deploy without `--no-execute-changeset`.
+Check the changeset for these absences: Route 53, `admin.terrapulse.com`, `geo-map-tiles`, a public bucket, a Cognito user, and any data route without the JWT authorizer. `OPTIONS /v1/{proxy+}` is the only unauthenticated route, and it returns 204 only for the console origin. Leave `EnableBuilds=false`, `RendererInvokeEnabled=false`, and `TileBackendBaseUrl` empty. With those defaults the changeset does not create Batch, SQS, or the builds bucket. Then deploy without `--no-execute-changeset`.
 
 Useful outputs: `ConsoleUrl`, `DistributionDomainName`, `DistributionId`, `HttpApiEndpoint`, `FrontendBucketName`, `RegistryTableName`, `UserPoolId`, `UserPoolClientId`, `HostedUiBaseUrl`, `ApiRoleArn`, `SeedInserted`, `TileBackendBaseUrl`, `TilePathOrder`.
 
@@ -140,6 +140,7 @@ There is no NAT gateway, load balancer, or database server. Idle cost is usually
 - Cognito stays in the free tier at this size. MFA is a software token. Advanced security is not enabled. No invitation email is sent because no user is created.
 - CloudFront is price class 100. The private bucket is tiny. Noncurrent console versions expire after 30 days.
 - Log groups retain 14 days. API access logs omit the authorization header and JWT claims. The stage throttles at 10 requests per second, burst 20.
+- Batch and the builds bucket are not created while `EnableBuilds` is false or the image, subnets, or security group are empty. After they are created, Fargate is minimum 0 vCPU and maximum 4, so idle Batch cost stays at zero until a job runs. There is still no NAT gateway. See `management/docs/raster-worker.md`.
 
 ## First admin, later
 

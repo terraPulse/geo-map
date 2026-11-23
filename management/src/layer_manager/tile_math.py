@@ -16,16 +16,15 @@ def tile_span(level):
     return (2 * HALF) / (2 ** level)
 
 
-def count_tiles(bounds, zooms, merge):
-    """Return (count, sample) or raise ValueError if the box is not usable."""
+def iter_blocks(bounds, zooms, merge):
+    """Version-2 block origins. One block is merge by merge Web Mercator tiles."""
     merge = int(merge)
     if merge < 1 or merge > MAX_MERGE:
         raise ValueError("tile_merge")
     minx, miny, maxx, maxy = (float(bounds["minx"]), float(bounds["miny"]), float(bounds["maxx"]), float(bounds["maxy"]))
     if minx >= maxx or miny >= maxy:
         raise ValueError("bounds")
-    total = 0
-    sample = []
+    blocks = []
     for level in zooms:
         level = int(level)
         if level < 0 or level > 24:
@@ -38,11 +37,26 @@ def count_tiles(bounds, zooms, merge):
         row1 = min(limit - 1, int((maxy + HALF) / span))
         if col1 < col0 or row1 < row0:
             continue
-        start_col = col0 - (col0 % merge)
-        start_row = row0 - (row0 % merge)
-        cols = list(range(start_col, col1 + 1, merge))
-        rows = list(range(start_row, row1 + 1, merge))
-        total += len(cols) * len(rows)
-        if len(sample) < 5 and cols and rows:
-            sample.append({"z": level, "x": cols[0], "y": rows[0]})
-    return total, sample
+        for y in range(row0 - (row0 % merge), row1 + 1, merge):
+            for x in range(col0 - (col0 % merge), col1 + 1, merge):
+                origin_x = -HALF + x * span
+                origin_y = -HALF + y * span
+                blocks.append({
+                    "z": level,
+                    "x": x,
+                    "y": y,
+                    "minx": origin_x,
+                    "miny": origin_y,
+                    "maxx": origin_x + span * merge,
+                    "maxy": origin_y + span * merge,
+                    "width": TILE_PX * merge,
+                    "height": TILE_PX * merge,
+                })
+    return blocks
+
+
+def count_tiles(bounds, zooms, merge):
+    """Return (count, sample). The sample is not a substitute for the block list."""
+    blocks = iter_blocks(bounds, zooms, merge)
+    sample = [{"z": block["z"], "x": block["x"], "y": block["y"]} for block in blocks[:5]]
+    return len(blocks), sample

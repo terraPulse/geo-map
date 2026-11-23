@@ -19,8 +19,22 @@ Target, when the parent deploys: account `544020760996`, region `us-west-2`, CLI
 | Registry schema in `interfaces/` | Not copied. Parent reconciles `layer-registry-v1.schema.json` before shared use. |
 | Production catalog | Refused. Fixtures are synthetic. Live `setting.ini` paths that name `geo-map-tiles` cannot be stored. |
 
+## Required before a real pyramid job can be queued
+
+These stay empty, so the default stack update does not create them. See `management/docs/raster-worker.md`.
+
+| Parameter | Why it blocks |
+| --- | --- |
+| `EnableBuilds` | Default `false`. The API executor stays `disabled` and does not render. |
+| `SourceBucketName` and `SourceKeyPrefix` | Read-only allowlist. A tile bucket is refused. |
+| `BuildImageUri` | No image was built here. Docker is not installed on the cloud agent. |
+| `BuildSubnetIds` | At least one subnet. Public subnets avoid a NAT gateway. |
+| `BuildSecurityGroupId` | Security group for the Fargate task. |
+
+The output bucket name, when that condition is true, is `geo-map-layer-manager-staging-builds-544020760996`.
+
 ## Safe to leave at defaults
 
-`Stage=staging`, `SeedSyntheticFixtures=true`, `TilePathOrder=map`, `PreviewAllowedHosts` empty, `EnablePitr=true`, `ReservedConcurrentExecutions=2`.
+`Stage=staging`, `SeedSyntheticFixtures=true`, `TilePathOrder=map`, `PreviewAllowedHosts` empty, `EnablePitr=true`, `ReservedConcurrentExecutions=2`, `EnableBuilds=false`, `BuildImageUri` empty, `RendererInvokeEnabled=false`.
 
 `ReservedConcurrentExecutions` fails if the account cannot reserve that many executions. Lower the parameter; do not set it to 0, because zero reserved concurrency stops every invoke.

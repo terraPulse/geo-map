@@ -1,5 +1,6 @@
-"""Build queue and worker. Real GDAL builds stay locked; fixtures are labeled."""
+"""Build queue and raster worker. gio is not called."""
 
+import json
 import os
 import threading
 import uuid
@@ -8,6 +9,7 @@ from .build_allow import output_prefix_for, parse_allowlist, resolve_key
 from .canonical import content_digest, utcnow
 from .errors import Conflict, NotFound, ValidationFailed
 from .png_codec import encode_rgba, png_size
+from .pyramid_engine import PyramidError, describe_raster, render_pyramid, write_gradient_geotiff
 from .schema_contract import CONFIRM_PUBLISH, CONFIRM_QUEUE_BUILD
 from .tile_math import MAX_MERGE, count_tiles
 from .validate import digest_input, structural_errors, validate_client_layer, validate_tag
@@ -28,6 +30,11 @@ FIXTURE_SOURCE = {
         "read_s3": False,
     },
 }
+
+RASTER_STOPS = (
+    {"value": 0, "rgba": [0, 0, 180, 255]},
+    {"value": 100, "rgba": [180, 0, 0, 255]},
+)
 
 
 class BuildStore:
@@ -74,11 +81,13 @@ def json_copy(value):
 
 
 class BuildService:
-    def __init__(self, store, settings, layer_service, output_root):
+    def __init__(self, store, settings, layer_service, output_root, source_fetch=None, queue_client=None):
         self.store = store
         self.settings = settings
         self.layers = layer_service
         self.output_root = output_root
+        self.source_fetch = source_fetch
+        self.queue_client = queue_client
         self._lock = threading.Lock()
 
     def config(self):
@@ -89,13 +98,17 @@ class BuildService:
             "executor": self.settings.build_executor,
             "runtime": runtime,
             "max_tiles": self.settings.max_build_tiles,
+            "batch_size": self.settings.max_build_tiles,
+            "absolute_max": self.settings.build_absolute_max,
+            "orchestrator": self.settings.orchestrator,
             "max_merge": MAX_MERGE,
             "output_configured": bool(self.settings.output_prefix),
             "sources": [item["id"] for item in self._sources()],
             "real_s3_writes": False,
             "note": (
-                "Real S3 builds are disabled until an allowlisted source and the gio/GDAL worker are configured. "
-                "A fixture job is labeled fixture-offline and is not an S3 build."
+                "32 is the batch size, not a limit on the pyramid. "
+                "The staging API stays disabled until an allowlisted source, output bucket, image, and subnets are set. "
+                "A rasterio run writes local version-2 PNGs and is not an S3 build. gio is not used."
             ),
         }
 
@@ -104,14 +117,38 @@ class BuildService:
 
     def inspect(self, source_id, key=None):
         source = self._source(source_id)
-        if source["kind"] == "fixture-offline":
+        if source["kind"] in {"fixture-offline", "raster-fixture"}:
             info = dict(source["inspection"])
             info["source_id"] = source_id
             info["key"] = None
+            info["uri"] = source.get("uri")
+            info["read_s3"] = False
             return info
         if key is None:
             raise ValidationFailed("An object key is required for an S3 source.", [])
         uri = resolve_key(source["uri"], key)
+        if self.settings.build_executor == "rasterio":
+            if self.source_fetch is None:
+                return {
+                    "source_id": source_id,
+                    "uri": uri,
+                    "status": "blocked",
+                    "code": "source_reader_unconfigured",
+                    "crs": None,
+                    "resolution_m": None,
+                    "bands": None,
+                    "nodata": None,
+                    "bounds": None,
+                    "read_s3": False,
+                    "message": "No S3 reader is configured. The object was not fetched and no metadata was invented.",
+                }
+            path = self.source_fetch(uri)
+            info = describe_raster(path)
+            info["source_id"] = source_id
+            info["uri"] = uri
+            info["key"] = key
+            info["status"] = "inspected"
+            return info
         runtime = probe_builder()
         if not runtime["gio_importable"] or not runtime["gdal_importable"]:
             return {
@@ -155,6 +192,8 @@ class BuildService:
         except ValueError as exc:
             raise ValidationFailed(str(exc), []) from exc
         pixels = total * (256 * merge) ** 2
+        batch = max(1, int(self.settings.max_build_tiles))
+        absolute = int(self.settings.build_absolute_max)
         plan = {
             "source_id": source["id"],
             "source_kind": source["kind"],
@@ -167,14 +206,22 @@ class BuildService:
             "resampling": body.get("resampling") or "nearest",
             "resampling_applied": False,
             "tile_count": total,
+            "batch_size": batch,
+            "batch_count": (total + batch - 1) // batch if total else 0,
+            "absolute_max": absolute,
             "pixel_estimate": pixels,
             "storage_bytes_upper": pixels * 4,
             "approximate": True,
             "sample_tiles": sample,
+            "bounds": inspection.get("bounds"),
+            "source_uri": inspection.get("uri") or source.get("uri"),
             "layout": "version-2-tiles",
-            "output_note": "A later real build would write a new version prefix. This plan writes nothing.",
+            "output_note": (
+                f"The raster engine writes version-2 blocks in batches of {batch}. "
+                "That batch size is not a claim that one batch covers a global pyramid."
+            ),
         }
-        accepted = 0 < total <= self.settings.max_build_tiles and merge <= MAX_MERGE
+        accepted = 0 < total <= absolute and merge <= MAX_MERGE
         plan["accepted"] = accepted
         plan["submittable"] = accepted and self._can_submit(source)
         plan["reason"] = None if plan["submittable"] else self._block_reason(source, accepted)
@@ -202,14 +249,14 @@ class BuildService:
         job = {
             "job_id": job_id,
             "status": "queued",
-            "execution_mode": "fixture-offline" if plan["source_kind"] == "fixture-offline" else "gio",
+            "execution_mode": _execution_mode(plan["source_kind"], self.settings.build_executor),
             "real_s3_write": False,
             "actor": actor,
             "role": role,
             "idempotency_key": key,
             "plan_digest": plan["content_digest"],
             "plan": plan,
-            "source": {"id": plan["source_id"], "kind": plan["source_kind"]},
+            "source": {"id": plan["source_id"], "kind": plan["source_kind"], "uri": plan.get("source_uri")},
             "output_prefix": prefix,
             "attempt": 1,
             "cancel_requested": False,
@@ -217,11 +264,38 @@ class BuildService:
             "checkpoint": None,
             "logs": [{"at": utcnow(), "message": "queued"}],
             "tiles_written": 0,
+            "completed": [],
             "output_validation": {"ok": False, "real_s3": False},
             "created_at": utcnow(),
             "updated_at": utcnow(),
         }
+        if self.settings.orchestrator == "batch":
+            self._enqueue(job)
         return {"job": self.store.save(job), "duplicate": False}
+
+    def _enqueue(self, job):
+        if not self.settings.build_queue_url and self.queue_client is None:
+            raise Conflict("Build queue is not configured. No job was submitted.", [])
+        client = self.queue_client
+        if client is None:
+            import boto3
+
+            client = boto3.client("sqs", region_name=self.settings.authorized_region)
+        body = {
+            "job_id": job["job_id"],
+            "source_uri": job["source"].get("uri"),
+            "allowlist": self.settings.source_allowlist_text,
+            "bounds": job["plan"].get("bounds"),
+            "zooms": job["plan"]["zooms"],
+            "tile_merge": job["plan"]["tile_merge"],
+            "resampling": job["plan"]["resampling"],
+            "stops": list(RASTER_STOPS),
+            "output_prefix": job["output_prefix"],
+            "batch_size": job["plan"].get("batch_size"),
+            "completed": [],
+        }
+        client.send_message(QueueUrl=self.settings.build_queue_url or "configured", MessageBody=json.dumps(body))
+        job["logs"].append({"at": utcnow(), "message": "enqueued for Batch"})
 
     def get(self, job_id):
         job = self.store.get(job_id)
@@ -249,14 +323,20 @@ class BuildService:
             job["attempt"] += 1
             job["status"] = "queued"
             job["cancel_requested"] = False
-            job["progress"] = {"completed_tiles": 0, "total_tiles": job["plan"]["tile_count"], "fraction": 0}
-            job["tiles_written"] = 0
+            job["progress"] = {
+                "completed_tiles": len(job.get("completed") or []),
+                "total_tiles": job["plan"]["tile_count"],
+                "fraction": 0,
+            }
+            job["tiles_written"] = len(job.get("completed") or [])
             job["output_validation"] = {"ok": False, "real_s3": False}
             job["logs"].append({"at": utcnow(), "message": f"retry {job['attempt']} by {actor}"})
             job["updated_at"] = utcnow()
             return {"job": self.store.save(job)}
 
     def run_once(self):
+        if self.settings.orchestrator == "batch":
+            return None
         job = self._next_queued()
         if job is None:
             return None
@@ -269,6 +349,8 @@ class BuildService:
         self.store.save(job)
         if job["execution_mode"] == "fixture-offline":
             return self._run_fixture(job)
+        if job["execution_mode"] == "rasterio":
+            return self._run_rasterio(job)
         return self._refuse_gio(job)
 
     def publish(self, job_id, actor, role, confirmation, expected_revision=None):
@@ -293,14 +375,14 @@ class BuildService:
                 "persistent": True,
             },
             "cog": None,
-            "bounds": FIXTURE_SOURCE["inspection"]["bounds"],
+            "bounds": job["plan"].get("bounds") or FIXTURE_SOURCE["inspection"]["bounds"],
             "style": {"type": "color-ramp", "stops": [{"value": 0, "rgba": [70, 130, 180, 255], "label": "fixture"}]},
             "nodata": {"min_value": None, "max_value": None, "fill_nodata": None, "raster_nodata": None},
             "source_revisions": [
                 {
                     "revision_id": job["job_id"][:12],
-                    "uri": "synthetic://fixture/build/" + job["job_id"],
-                    "note": "fixture-offline build. Not an S3 object and not a production tile.",
+                    "uri": job["source"].get("uri") or "synthetic://fixture/build/" + job["job_id"],
+                    "note": job["execution_mode"] + " output. Not a production tile bucket write.",
                     "recorded_at": utcnow(),
                 }
             ],
@@ -389,6 +471,14 @@ class BuildService:
         rows = []
         if self.settings.build_executor == "fixture-offline":
             rows.append({k: FIXTURE_SOURCE[k] for k in ("id", "kind", "title", "uri", "real_s3")})
+        if self.settings.build_executor == "rasterio":
+            rows.append({
+                "id": "raster-fixture",
+                "kind": "raster-fixture",
+                "title": "Generated GeoTIFF exercised by the rasterio engine",
+                "uri": "synthetic://fixture/gradient-geotiff",
+                "real_s3": False,
+            })
         for item in self.settings.source_allowlist:
             rows.append({"id": item["id"], "kind": "s3", "title": item["id"], "uri": item["uri"], "real_s3": False})
         return rows
@@ -398,20 +488,116 @@ class BuildService:
             if item["id"] == source_id:
                 if item["kind"] == "fixture-offline":
                     return FIXTURE_SOURCE
+                if item["kind"] == "raster-fixture":
+                    from .pyramid_engine import fixture_bounds
+
+                    return {**item, "inspection": {
+                        "crs": "EPSG:3857",
+                        "resolution_m": None,
+                        "bands": 1,
+                        "nodata": -9999,
+                        "bounds": fixture_bounds(),
+                        "source": "rasterio",
+                        "read_s3": False,
+                    }}
                 return item
         raise ValidationFailed("Source is not in the configured allowlist.", [])
 
     def _can_submit(self, source):
         if source["kind"] == "fixture-offline":
             return self.settings.build_executor == "fixture-offline"
-        return bool(self.settings.builds_enabled and self.settings.build_executor == "gio")
+        if source["kind"] == "raster-fixture":
+            return self.settings.build_executor == "rasterio"
+        return bool(self.settings.builds_enabled and self.settings.build_executor == "rasterio")
 
     def _block_reason(self, source, accepted):
         if not accepted:
-            return "Plan exceeds the tile cap. It was not queued."
-        if source["kind"] != "fixture-offline" and not self.settings.builds_enabled:
+            return "Plan exceeds the absolute tile budget. It was not queued."
+        if source["kind"] == "s3" and not self.settings.builds_enabled:
             return "Real builds are disabled. No job was queued."
         return "This executor cannot queue that source."
+
+    def _run_rasterio(self, job):
+        try:
+            if job["source"]["kind"] == "raster-fixture":
+                source_path = os.path.join(self.output_root, job["output_prefix"], "source.tif")
+                os.makedirs(os.path.dirname(source_path), exist_ok=True)
+                meta = write_gradient_geotiff(source_path)
+                bounds = meta["bounds"]
+            else:
+                uri = job["source"].get("uri")
+                if self.source_fetch is None:
+                    raise PyramidError(
+                        "source_reader_unconfigured",
+                        "No S3 reader is configured. The object was not fetched and no PNG was written.",
+                    )
+                source_path = self.source_fetch(uri)
+                bounds = job["plan"].get("bounds") or job["source"].get("bounds")
+                if not bounds:
+                    raise PyramidError("bounds", "S3 inspect did not supply bounds. No PNG was written.")
+            destination = os.path.join(self.output_root, job["output_prefix"])
+
+            def should_continue():
+                current = self.store.get(job["job_id"])
+                return current is not None and not current["cancel_requested"]
+
+            result = render_pyramid(
+                source_path,
+                destination,
+                bounds,
+                job["plan"]["zooms"],
+                job["plan"]["tile_merge"],
+                job["plan"]["resampling"],
+                list(RASTER_STOPS),
+                completed=job.get("completed") or [],
+                batch_size=job["plan"].get("batch_size") or self.settings.max_build_tiles,
+                should_continue=should_continue,
+            )
+        except PyramidError as exc:
+            job["status"] = "failed"
+            job["error"] = {"code": exc.code, "message": exc.message}
+            job["tiles_written"] = len(job.get("completed") or [])
+            job["real_s3_write"] = False
+            job["logs"].append({"at": utcnow(), "message": exc.message})
+            job["updated_at"] = utcnow()
+            return self.store.save(job)
+        current = self.store.get(job["job_id"])
+        current["completed"] = result["completed"]
+        current["tiles_written"] = len(result["completed"])
+        current["real_s3_write"] = False
+        total = result["total"] or 1
+        current["progress"] = {
+            "completed_tiles": len(result["completed"]),
+            "total_tiles": result["total"],
+            "fraction": len(result["completed"]) / total,
+        }
+        current["checkpoint"] = result["written"][-1] if result["written"] else current.get("checkpoint")
+        current["logs"].append({
+            "at": utcnow(),
+            "message": f"rasterio wrote {len(result['written'])} block(s); {len(result['completed'])}/{result['total']}",
+        })
+        if result["stopped"] or current["cancel_requested"]:
+            current["status"] = "cancelled"
+        elif len(result["completed"]) < result["total"]:
+            current["status"] = "queued"
+        else:
+            current["status"] = "succeeded"
+            current["output_validation"] = {
+                "ok": True,
+                "real_s3": False,
+                "engine": "rasterio",
+                "png_blocks": len(result["completed"]),
+            }
+        current["updated_at"] = utcnow()
+        return self.store.save(current)
+
+
+def _execution_mode(kind, executor):
+    if kind == "fixture-offline":
+        return "fixture-offline"
+    if executor == "rasterio" and kind in {"raster-fixture", "s3"}:
+        return "rasterio"
+    return "gio"
 
 
 def probe_builder():

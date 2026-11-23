@@ -74,6 +74,12 @@ class TemplateTests(unittest.TestCase):
         backend = self.template["Parameters"]["TileBackendBaseUrl"]
         self.assertEqual(backend["Default"], "")
         self.assertEqual(self.template["Parameters"]["TilePathOrder"]["Default"], "map")
+        self.assertEqual(self.template["Parameters"]["EnableBuilds"]["Default"], "false")
+        self.assertEqual(self.template["Parameters"]["BuildImageUri"]["Default"], "")
+        self.assertEqual(self.template["Parameters"]["BuildSubnetIds"]["Default"], "")
+        self.assertEqual(self.template["Parameters"]["BuildSecurityGroupId"]["Default"], "")
+        self.assertIn("BuildInfra", self.template["Conditions"])
+        self.assertNotIn("s3:DeleteObject", self.text)
         self.assertEqual(self.template["Resources"]["ApiLogGroup"]["Properties"]["RetentionInDays"], 14)
         log_format = self.template["Resources"]["ApiStage"]["Properties"]["AccessLogSettings"]["Format"]
         self.assertNotIn("authorization", log_format.lower())

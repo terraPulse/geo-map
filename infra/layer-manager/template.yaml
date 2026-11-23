@@ -88,7 +88,7 @@ Parameters:
     Type: String
     Default: "false"
     AllowedValues: ["true", "false"]
-    Description: Intent to allow real builds. Stays off unless SourceBucketName is also set. gio/GDAL is not in this Lambda.
+    Description: Intent to allow real builds. Stays off unless the source bucket, image, subnets, and security group are also set. The API Lambda does not render tiles.
   SourceBucketName:
     Type: String
     Default: ""
@@ -98,7 +98,22 @@ Parameters:
     Type: String
     Default: "datasets/"
     AllowedPattern: "^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$"
-    Description: Prefix inside SourceBucketName. The job role, when added later, may only read this prefix.
+    Description: Prefix inside SourceBucketName. The job role may only read this prefix, and only when the build resources are created.
+  BuildImageUri:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[A-Za-z0-9._:/@-]{1,255}$"
+    Description: Container image for the raster worker. Empty keeps Batch out of the stack. This template does not build or push the image.
+  BuildSubnetIds:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^subnet-[a-z0-9]+(,subnet-[a-z0-9]+){0,3}$"
+    Description: Comma-separated subnet ids for Fargate. Public subnets avoid a NAT gateway. Empty keeps Batch out of the stack.
+  BuildSecurityGroupId:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^sg-[a-z0-9]+$"
+    Description: Security group for the Fargate task. Empty keeps Batch out of the stack.
 
 Conditions:
   UsePitr: !Equals [!Ref EnablePitr, "true"]
@@ -106,6 +121,11 @@ Conditions:
   RealBuilds: !And
     - !Equals [!Ref EnableBuilds, "true"]
     - !Not [!Equals [!Ref SourceBucketName, ""]]
+  BuildInfra: !And
+    - !Condition RealBuilds
+    - !Not [!Equals [!Ref BuildImageUri, ""]]
+    - !Not [!Equals [!Ref BuildSubnetIds, ""]]
+    - !Not [!Equals [!Ref BuildSecurityGroupId, ""]]
 
 Resources:
   FrontendBucket:
@@ -475,13 +495,16 @@ Resources:
             - "arn:aws:lambda:us-west-2:544020760996:function:geomap-tile-pyramid-test"
             - ""
           LAYER_MANAGER_BUILDS_ENABLED: !If [RealBuilds, "true", "false"]
-          LAYER_MANAGER_BUILD_EXECUTOR: disabled
+          LAYER_MANAGER_BUILD_EXECUTOR: !If [BuildInfra, "rasterio", "disabled"]
+          LAYER_MANAGER_ORCHESTRATOR: !If [BuildInfra, "batch", "in-process"]
+          LAYER_MANAGER_BUILD_QUEUE_URL: !If [BuildInfra, !Ref BuildQueue, ""]
           LAYER_MANAGER_SOURCE_ALLOWLIST: !If
             - RealBuilds
             - !Sub "datasets=s3://${SourceBucketName}/${SourceKeyPrefix}"
             - ""
           LAYER_MANAGER_OUTPUT_PREFIX: builds
           LAYER_MANAGER_MAX_BUILD_TILES: "32"
+          LAYER_MANAGER_BUILD_ABSOLUTE_MAX: "4096"
 
   RendererInvokePolicy:
     Type: AWS::IAM::Policy
@@ -590,6 +613,242 @@ Resources:
       SeedSyntheticFixtures: !Ref SeedSyntheticFixtures
       SchemaId: geo-map.layer-registry.v1
 
+  BuildOutputBucket:
+    Type: AWS::S3::Bucket
+    Condition: BuildInfra
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Stage}-builds-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-build-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+  BuildDlq:
+    Type: AWS::SQS::Queue
+    Condition: BuildInfra
+    Properties:
+      MessageRetentionPeriod: 1209600
+
+  BuildQueue:
+    Type: AWS::SQS::Queue
+    Condition: BuildInfra
+    Properties:
+      VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt BuildDlq.Arn
+        maxReceiveCount: 3
+
+  BuildJobRole:
+    Type: AWS::IAM::Role
+    Condition: BuildInfra
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: pyramid-object-access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadAllowlistedSource
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${SourceBucketName}/${SourceKeyPrefix}*"
+              - Sid: ListAllowlistedSource
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub "arn:aws:s3:::${SourceBucketName}"
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - !Sub "${SourceKeyPrefix}*"
+              - Sid: WriteVersionedOutput
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${BuildOutputBucket}/builds/*"
+
+  BuildExecutionRole:
+    Type: AWS::IAM::Role
+    Condition: BuildInfra
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  BuildComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Condition: BuildInfra
+    Properties:
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        Type: FARGATE
+        MaxvCpus: 4
+        Subnets: !Split [",", !Ref BuildSubnetIds]
+        SecurityGroupIds:
+          - !Ref BuildSecurityGroupId
+
+  BuildJobQueue:
+    Type: AWS::Batch::JobQueue
+    Condition: BuildInfra
+    Properties:
+      State: ENABLED
+      Priority: 1
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref BuildComputeEnvironment
+
+  BuildJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Condition: BuildInfra
+    Properties:
+      Type: container
+      PlatformCapabilities:
+        - FARGATE
+      Timeout:
+        AttemptDurationSeconds: 3600
+      RetryStrategy:
+        Attempts: 2
+      ContainerProperties:
+        Image: !Ref BuildImageUri
+        Command:
+          - python
+          - -m
+          - layer_manager.worker_main
+        ResourceRequirements:
+          - Type: VCPU
+            Value: "1"
+          - Type: MEMORY
+            Value: "2048"
+        ExecutionRoleArn: !GetAtt BuildExecutionRole.Arn
+        JobRoleArn: !GetAtt BuildJobRole.Arn
+        NetworkConfiguration:
+          AssignPublicIp: ENABLED
+        Environment:
+          - Name: BUILD_ALLOW_S3
+            Value: "1"
+          - Name: BUILD_OUTPUT_BUCKET
+            Value: !Ref BuildOutputBucket
+
+  BuildSubmitterRole:
+    Type: AWS::IAM::Role
+    Condition: BuildInfra
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: submit-one-batch-job
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadBuildQueue
+                Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt BuildQueue.Arn
+              - Sid: SubmitPyramidJob
+                Effect: Allow
+                Action:
+                  - batch:SubmitJob
+                Resource:
+                  - !Ref BuildJobQueue
+                  - !Ref BuildJobDefinition
+              - Sid: WriteSubmitterLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${BuildSubmitterLogGroup.Arn}:*"
+
+  BuildSubmitterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: BuildInfra
+    Properties:
+      RetentionInDays: 14
+
+  BuildSubmitter:
+    Type: AWS::Lambda::Function
+    Condition: BuildInfra
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Stage}-build-submit"
+      Runtime: python3.12
+      Architectures: [arm64]
+      Handler: layer_manager.batch_submit.handler
+      Timeout: 30
+      MemorySize: 256
+      ReservedConcurrentExecutions: !Ref ReservedConcurrentExecutions
+      Role: !GetAtt BuildSubmitterRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref BuildSubmitterLogGroup
+      Code:
+        S3Bucket: !Ref ArtifactBucketName
+        S3Key: !Ref ArtifactKey
+      Environment:
+        Variables:
+          BUILD_JOB_QUEUE: !Ref BuildJobQueue
+          BUILD_JOB_DEFINITION: !Ref BuildJobDefinition
+
+  BuildSubmitMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Condition: BuildInfra
+    Properties:
+      EventSourceArn: !GetAtt BuildQueue.Arn
+      FunctionName: !Ref BuildSubmitter
+      BatchSize: 1
+
+  ApiBuildEnqueuePolicy:
+    Type: AWS::IAM::Policy
+    Condition: BuildInfra
+    Properties:
+      PolicyName: enqueue-pyramid-build
+      Roles:
+        - !Ref ApiRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EnqueueOnly
+            Effect: Allow
+            Action: sqs:SendMessage
+            Resource: !GetAtt BuildQueue.Arn
+
 Outputs:
   DistributionDomainName:
     Value: !GetAtt Distribution.DomainName
@@ -630,3 +889,6 @@ Outputs:
   TileBackendIntegration:
     Value: address-only-or-unset
     Description: This stack does not call the tile backend and does not claim it is integrated.
+  BuildInfraEnabled:
+    Value: !If [BuildInfra, "true", "false"]
+    Description: Batch, SQS, and the output bucket exist only when this is true. The default deploy leaves it false.

@@ -30,7 +30,7 @@
     main.textContent = "";
     const page = el("section", { className: "panel" },
       el("h2", { text: "Dataset build and renderer preview" }),
-      el("p", { className: "note", text: "Real S3 builds stay disabled until an allowlisted source and a gio/GDAL worker are configured. A fixture run is not an S3 build. Renderer preview, when enabled, is a separate fixture or Lambda invoke and does not publish the registry." })
+      el("p", { className: "note", text: "A queued raster job writes version-2 PNG blocks in batches. The batch size of 32 is not the size of the pyramid. Staging stays off until an allowlisted source, output bucket, container image, and subnets are set. A local rasterio run is not an S3 build. Renderer preview, when enabled, uses the exact function ARN and does not publish the registry." })
     );
     const status = el("div", { id: "build-status" });
     const preview = el("div", { id: "renderer-preview" });
