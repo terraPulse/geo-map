@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>geo-map layer manager</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="app">
+    <aside class="sidenav">
+      <div class="brand">
+        <img class="mark" src="./favicon.svg" width="28" height="28" alt="">
+        <div>
+          <p class="brand-kicker">geo-map</p>
+          <p class="brand-title">Layer manager</p>
+        </div>
+      </div>
+      <nav aria-label="Sections">
+        <a id="nav-layers" href="#/layers">Layers</a>
+        <a id="nav-build" href="#/build">Datasets</a>
+        <a id="nav-preview" href="#/preview">Preview</a>
+      </nav>
+      <p class="sidenav-foot">Registry edits do not regenerate PNG pyramids.</p>
+    </aside>
+    <div class="maincol">
+      <header class="topbar">
+        <div>
+          <p id="crumb" class="crumb">Layers</p>
+          <p id="crumb-sub" class="crumb-sub">Staging registry</p>
+        </div>
+        <div id="auth-slot" class="auth-slot"></div>
+      </header>
+      <p id="notice" class="notice" role="status" hidden></p>
+      <main id="main" tabindex="-1">
+        <p id="boot" class="loading">Loading the console.</p>
+      </main>
+    </div>
+  </div>
+  <div id="live" class="live" aria-live="polite"></div>
+  <script src="./config.js"></script>
+  <script src="./client.js"></script>
+  <script src="./auth.js"></script>
+  <script src="./build.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# Parameters and blockers
+
+Target, when the parent deploys: account `544020760996`, region `us-west-2`, CLI profile `tp`. The profile name is not the IAM user name. This implementation did not call AWS and did not deploy.
+
+## Required before the stack can be created
+
+| Parameter | Why it blocks |
+| --- | --- |
+| `ArtifactKey` | No default. The Lambda zip must already be in the new artifact bucket. |
+| `CognitoDomainPrefix` | No default. The prefix is global. Suggested `tp-geomap-layers-544020760996`. If it is taken, choose another. |
+| Account and region rules | The template asserts account `544020760996` and region `us-west-2`. |
+
+## Supplied by the parent later
+
+| Item | State in this branch |
+| --- | --- |
+| Tile test endpoint | `TileBackendBaseUrl` default is empty. Preview of the test renderer is a Lambda invoke of `geomap-tile-pyramid-test` only when `RendererInvokeEnabled=true`. |
+| First test location | The operator selected `s3://geo-map-tiles-dev/tiles`. Format is not assumed. The build allowlist still refuses that bucket name. No source grant or build job is added. |
+| First admin | Pool has no users and sends no invitations. Enroll with `--message-action SUPPRESS` after the identity is confirmed. MFA is required. |
+| Registry schema in `interfaces/` | Not copied. Parent reconciles `layer-registry-v1.schema.json` before shared use. |
+| Production catalog | Refused. Fixtures are synthetic. Live `setting.ini` paths that name `geo-map-tiles` cannot be stored. |
+
+## Required before a real pyramid job can be queued
+
+These stay empty, so the default stack update does not create them. See `management/docs/raster-worker.md`.
+
+| Parameter | Why it blocks |
+| --- | --- |
+| `EnableBuilds` | Default `false`. The API executor stays `disabled` and does not render. |
+| `SourceBucketName` and `SourceKeyPrefix` | Read-only allowlist. A tile bucket is refused. |
+| `BuildImageUri` | Must be `544020760996.dkr.ecr.us-west-2.amazonaws.com/geo-map-layer-manager-worker:<tag>`. `latest` and other registries are rejected. No image was built here. |
+| `BuildSubnetIds` | At least one subnet. Public subnets avoid a NAT gateway. |
+| `BuildSecurityGroupId` | Security group for the Fargate task. |
+
+The output bucket name, when that condition is true, is `geo-map-layer-manager-staging-builds-544020760996`.
+
+## Safe to leave at defaults
+
+`Stage=staging`, `SeedSyntheticFixtures=true`, `TilePathOrder=map`, `PreviewAllowedHosts` empty, `EnablePitr=true`, `ReservedConcurrentExecutions=2`, `EnableBuilds=false`, `BuildImageUri` empty, `RendererInvokeEnabled=false`.
+
+`ReservedConcurrentExecutions` fails if the account cannot reserve that many executions. Lower the parameter; do not set it to 0, because zero reserved concurrency stops every invoke.

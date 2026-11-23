@@ -1,0 +1,67 @@
+{
+  "$id": "geo-map.layer-registry.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "geo-map layer registry record",
+  "type": "object",
+  "additionalProperties": false,
+  "description": "Staging registry record. This file lives under management/contracts. The parent integrates it into the sibling interfaces branch before shared use. It is a different namespace from legacy setting.ini.",
+  "x-geo-map-coordination": {
+    "ownedBy": "management/contracts/layer-registry-v1.schema.json",
+    "interfacesCopy": "Parent integrates this schema into the sibling interfaces PR before shared use. This branch does not modify interfaces/.",
+    "legacyNamespace": "geo-map.legacy-setting-ini"
+  },
+  "required": [
+    "schema",
+    "tag",
+    "title",
+    "status",
+    "revision",
+    "synthetic",
+    "inventory",
+    "backend",
+    "pyramid",
+    "cog",
+    "bounds",
+    "style",
+    "nodata",
+    "source_revisions",
+    "authorized_tile_template",
+    "legacy_compat",
+    "validation",
+    "registry_effects",
+    "created_at",
+    "updated_at",
+    "updated_by",
+    "content_digest"
+  ],
+  "properties": {
+    "schema": {"const": "geo-map.layer-registry.v1"},
+    "tag": {"type": "string", "description": "Layer id. Slashes are significant path segments."},
+    "title": {"type": "string"},
+    "status": {"enum": ["draft", "published"]},
+    "revision": {"type": "integer", "minimum": 1},
+    "synthetic": {"type": "boolean"},
+    "inventory": {"enum": ["registry", "synthetic-fixture"]},
+    "backend": {"enum": ["png-pyramid", "cog"]},
+    "pyramid": {"type": ["object", "null"]},
+    "cog": {"type": ["object", "null"]},
+    "bounds": {"type": ["object", "null"]},
+    "style": {"type": "object"},
+    "nodata": {"type": "object"},
+    "source_revisions": {"type": "array"},
+    "authorized_tile_template": {"type": ["string", "null"]},
+    "legacy_compat": {"type": "object"},
+    "validation": {"type": "object"},
+    "registry_effects": {
+      "type": "object",
+      "properties": {
+        "png_pyramid_regenerated_on_write": {"const": false}
+      },
+      "required": ["png_pyramid_regenerated_on_write"]
+    },
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "updated_by": {"type": "string"},
+    "content_digest": {"type": "string"}
+  }
+}
