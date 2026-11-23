@@ -40,36 +40,8 @@
   let selected = null;
   let statusNote = "";
 
-  function apiBase() {
-    return (config.apiBase || "").replace(/\/$/, "");
-  }
-
-  function authHeaders() {
-    const headers = { "content-type": "application/json" };
-    if (config.authMode === "local-fixture") {
-      const name = sessionStorage.getItem(storageKey);
-      if (name) headers["x-layer-manager-fixture-actor"] = name;
-    } else {
-      const token = sessionStorage.getItem(tokenKey);
-      if (token) headers.authorization = "Bearer " + token;
-    }
-    return headers;
-  }
-
   async function api(method, path, body) {
-    const response = await fetch(apiBase() + path, {
-      method: method,
-      headers: authHeaders(),
-      body: body ? JSON.stringify(body) : undefined
-    });
-    const payload = await response.json();
-    if (!response.ok || payload.ok === false) {
-      const error = new Error((payload.error && payload.error.message) || "Request failed");
-      error.payload = payload;
-      error.status = response.status;
-      throw error;
-    }
-    return payload.result;
+    return window.LayerManagerClient.request(config, sessionStorage, fetch, method, path, body);
   }
 
   function signedIn() {
@@ -240,17 +212,17 @@
       search,
       table
     );
-    const aside = el("aside", { className: "panel" },
-      el("h2", { text: "Working with layers" }),
-      el("p", { className: "note", text: "Open a row for zooms, bounds, style, and validation. Saving a record does not regenerate PNG pyramids." })
+    const head = el("div", { className: "page-head" },
+      el("p", { className: "note", text: "Open a row for zooms, bounds, style, and validation." })
     );
     if (!actor || actor.role === "layer-admin") {
-      aside.appendChild(el("div", { className: "actions" },
+      head.appendChild(el("div", { className: "actions" },
         linkButton("Register a layer", "#/register"),
         linkButton("Import legacy metadata", "#/import", true)
       ));
     }
-    main.appendChild(el("div", { className: "layout" }, catalog, aside));
+    main.appendChild(head);
+    main.appendChild(catalog);
     await loadList("");
     search.focus();
   }

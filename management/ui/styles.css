@@ -53,14 +53,7 @@ body {
   gap: 1.5rem;
 }
 .brand { display: flex; gap: 0.7rem; align-items: center; }
-.mark {
-  width: 2rem;
-  height: 2rem;
-  border: 1.5px solid #d7e4ea;
-  background:
-    linear-gradient(135deg, transparent 46%, #2f8f88 46% 54%, transparent 54%),
-    var(--chrome-2);
-}
+.mark { width: 1.75rem; height: 1.75rem; display: block; }
 .brand-kicker, .brand-title, .crumb, .crumb-sub, .sidenav-foot { margin: 0; }
 .brand-kicker {
   font-size: 0.72rem;
@@ -164,8 +157,7 @@ tr.clickable:hover, tr.clickable:focus-visible { background: #f4f8f8; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .chip {
   font-size: 0.72rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   border-radius: 999px;
   padding: 0.15rem 0.45rem;
   background: #eef2f5;

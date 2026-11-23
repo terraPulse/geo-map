@@ -1,27 +1,6 @@
 (function (root) {
-  function headers() {
-    const value = { "content-type": "application/json" };
-    const actor = sessionStorage.getItem("geoMapLayerManagerActor");
-    const token = sessionStorage.getItem("geoMapLayerManagerToken");
-    if (actor) value["x-layer-manager-fixture-actor"] = actor;
-    if (token) value.authorization = "Bearer " + token;
-    return value;
-  }
-
-  async function call(method, path, body) {
-    const response = await fetch(path, { method: method, headers: headers(), body: body ? JSON.stringify(body) : undefined });
-    const type = response.headers.get("content-type") || "";
-    if (type.indexOf("image/png") === 0) {
-      if (!response.ok) throw new Error("Preview image failed");
-      return response.blob();
-    }
-    const payload = await response.json();
-    if (!response.ok || payload.ok === false) {
-      const error = new Error((payload.error && payload.error.message) || "Request failed");
-      error.payload = payload;
-      throw error;
-    }
-    return payload.result;
+  function call(method, path, body) {
+    return window.LayerManagerClient.request(window.LAYER_MANAGER_CONFIG, sessionStorage, fetch, method, path, body);
   }
 
   async function render(ctx) {
@@ -54,10 +33,7 @@
     status.appendChild(el("p", {}, el("span", { className: off ? "chip off" : "chip published", text: off ? "Builds off" : "Builds enabled" }), " ", el("span", { className: "note", text: "Executor " + config.executor + "." })));
     status.appendChild(el("p", { className: "lede", text: "The selected test location is s3://geo-map-tiles-dev/tiles. Its format is still being inspected, so it is not a build source and nothing is queued against it." }));
     if (off) {
-      status.appendChild(el("div", { className: "state" },
-        el("strong", { text: "No build is running" }),
-        el("span", { text: "Real builds stay off. This page does not invent job progress." })
-      ));
+      status.appendChild(el("p", { text: "No build is running. This page does not invent job progress." }));
     }
     const technical = el("details", {},
       el("summary", { text: "Build limits" }),
@@ -67,13 +43,7 @@
 
     const sources = await call("GET", "/v1/builds/sources");
     if (!sources.sources.length) {
-      formHost.appendChild(el("section", { className: "panel" },
-        el("h2", { text: "Allowlisted sources" }),
-        el("div", { className: "state" },
-          el("strong", { text: "No dataset is configured" }),
-          el("span", { text: "Only a configured source prefix can be planned. Arbitrary buckets are not accepted." })
-        )
-      ));
+      status.appendChild(el("p", { className: "note", text: "No source prefix is configured, so a dataset cannot be planned." }));
       return;
     }
     const form = el("form", { className: "panel" }, el("h2", { text: "Plan an allowlisted dataset" }));
