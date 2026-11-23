@@ -1,22 +1,22 @@
 # Staging deploy and rollback
 
-Do not run these commands from the implementation agent. The parent readiness executor runs them after review, with profile `mfeng`, region `us-west-2`, and account `544020760996`. Do not use profile `6g`. Do not change `admin.terrapulse.com`, existing APIs, DNS, or tile buckets.
+Do not run these commands from the implementation agent. The parent readiness executor runs them after review, with CLI profile `tp`, region `us-west-2`, and account `544020760996`. Profile `tp` is the existing CLI profile. It is not required to match the IAM user name. Do not use profile `6g` or a profile named `mfeng`. Do not change `admin.terrapulse.com`, existing APIs, DNS, or tile buckets.
 
 Nothing here creates a Cognito user or sends an invitation. The pool starts empty. The first admin is enrolled later, by the parent, for the owner's confirmed identity.
 
 ## Identity preflight
 
 ```bash
-export AWS_PROFILE=mfeng
+export AWS_PROFILE=tp
 export AWS_REGION=us-west-2
 export AWS_DEFAULT_REGION=us-west-2
 python3 infra/layer-manager/scripts/preflight_identity.py \
-  --profile mfeng --region us-west-2
+  --profile tp --region us-west-2
 python3 infra/layer-manager/scripts/preflight_identity.py \
-  --profile mfeng --region us-west-2 --call-sts
+  --profile tp --region us-west-2 --call-sts
 ```
 
-The first command does not call AWS. `--call-sts` must show account `544020760996`. Stop if it does not.
+The first command does not call AWS. `--call-sts` must show account `544020760996`. Stop if it does not. An ARN such as `arn:aws:iam::544020760996:user/mfeng` is valid with profile `tp`. The check compares the account, not the principal name.
 
 ## Package
 
@@ -35,7 +35,7 @@ The site directory has no `config.js` and no fixture catalog.
 
 ```bash
 aws cloudformation deploy \
-  --profile mfeng \
+  --profile tp \
   --region us-west-2 \
   --stack-name geo-map-layer-manager-staging-artifacts \
   --template-file infra/layer-manager/bootstrap-artifact-bucket.yaml \
@@ -45,7 +45,7 @@ aws cloudformation deploy \
 Read the changeset. It creates only `geo-map-layer-manager-staging-artifacts-544020760996`. Then run the same command without `--no-execute-changeset`.
 
 ```bash
-aws s3 cp --profile mfeng --region us-west-2 \
+aws s3 cp --profile tp --region us-west-2 \
   infra/layer-manager/dist/layer-manager-lambda.zip \
   s3://geo-map-layer-manager-staging-artifacts-544020760996/lambda/layer-manager-lambda.zip
 ```
@@ -54,11 +54,11 @@ Refuse the copy if the destination contains `geo-map-tiles`.
 
 ## Registry stack
 
-Pick a Cognito domain prefix that is free in Amazon Cognito. A suggested value is `tp-geomap-layers-544020760996`. Leave `TileBackendBaseUrl` empty until the performance-branch test endpoint exists.
+`CognitoDomainPrefix` `tp-geomap-layers-544020760996` is free. `ArtifactKey` is `lambda/layer-manager-lambda.zip`. Leave `TileBackendBaseUrl` empty. The renderer is a separate deployment protected by IAM. This console does not call it and does not send the admin token to it.
 
 ```bash
 aws cloudformation deploy \
-  --profile mfeng \
+  --profile tp \
   --region us-west-2 \
   --stack-name geo-map-layer-manager-staging \
   --template-file infra/layer-manager/template.yaml \
@@ -80,7 +80,7 @@ Useful outputs: `ConsoleUrl`, `DistributionDomainName`, `DistributionId`, `HttpA
 
 ```bash
 aws cloudformation describe-stacks \
-  --profile mfeng --region us-west-2 \
+  --profile tp --region us-west-2 \
   --stack-name geo-map-layer-manager-staging \
   --query "Stacks[0].Outputs" --output json > /tmp/layer-manager-outputs.json
 python3 - << 'PY'
@@ -92,10 +92,10 @@ PY
 python3 infra/layer-manager/scripts/render_config.py \
   --outputs /tmp/layer-manager-outputs-flat.json \
   --out infra/layer-manager/dist/site/config.js
-aws s3 sync --profile mfeng --region us-west-2 \
+aws s3 sync --profile tp --region us-west-2 \
   infra/layer-manager/dist/site \
   "s3://$(python3 -c 'import json; print(json.load(open("/tmp/layer-manager-outputs-flat.json"))["FrontendBucketName"])')/"
-aws cloudfront create-invalidation --profile mfeng \
+aws cloudfront create-invalidation --profile tp \
   --distribution-id "$(python3 -c 'import json; print(json.load(open("/tmp/layer-manager-outputs-flat.json"))["DistributionId"])')" \
   --paths "/*"
 ```
@@ -117,15 +117,15 @@ Static files can be restored from the frontend bucket's noncurrent versions for 
 Delete the application stack before the artifact stack. Empty only the buckets named by the stack outputs:
 
 ```bash
-aws s3 rm --profile mfeng --region us-west-2 \
+aws s3 rm --profile tp --region us-west-2 \
   "s3://FRONTEND_BUCKET_FROM_OUTPUT" --recursive
-aws cloudformation delete-stack --profile mfeng --region us-west-2 \
+aws cloudformation delete-stack --profile tp --region us-west-2 \
   --stack-name geo-map-layer-manager-staging
-aws cloudformation wait stack-delete-complete --profile mfeng --region us-west-2 \
+aws cloudformation wait stack-delete-complete --profile tp --region us-west-2 \
   --stack-name geo-map-layer-manager-staging
-aws s3 rm --profile mfeng --region us-west-2 \
+aws s3 rm --profile tp --region us-west-2 \
   "s3://geo-map-layer-manager-staging-artifacts-544020760996" --recursive
-aws cloudformation delete-stack --profile mfeng --region us-west-2 \
+aws cloudformation delete-stack --profile tp --region us-west-2 \
   --stack-name geo-map-layer-manager-staging-artifacts
 ```
 
@@ -145,12 +145,12 @@ There is no NAT gateway, load balancer, or database server. Idle cost is usually
 
 ```bash
 aws cognito-idp admin-create-user \
-  --profile mfeng --region us-west-2 \
+  --profile tp --region us-west-2 \
   --user-pool-id USER_POOL_ID_FROM_OUTPUT \
   --username CONFIRMED_EMAIL \
   --message-action SUPPRESS
 aws cognito-idp admin-add-user-to-group \
-  --profile mfeng --region us-west-2 \
+  --profile tp --region us-west-2 \
   --user-pool-id USER_POOL_ID_FROM_OUTPUT \
   --username CONFIRMED_EMAIL \
   --group-name layer-admin

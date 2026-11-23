@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Check the caller's account, region, and profile before a human deploys.
+"""Check the caller's account, region, and CLI profile before a human deploys.
 
 By default this script does not call AWS. The parent readiness executor may
-pass --call-sts after review. Profile 6g is refused. The expected profile
-is mfeng, the account is 544020760996, and the region is us-west-2.
+pass --call-sts after review. The CLI profile is tp. That name is not the
+IAM user name. Account 544020760996 and region us-west-2 are required.
+Profile 6g is refused. Profile mfeng is not a configured CLI profile.
 """
 
 import argparse
@@ -13,24 +14,34 @@ import sys
 
 EXPECTED_ACCOUNT = "544020760996"
 EXPECTED_REGION = "us-west-2"
-EXPECTED_PROFILE = "mfeng"
-REFUSED_PROFILE = "6g"
+EXPECTED_PROFILE = "tp"
+REFUSED_PROFILES = ("6g", "mfeng")
 
 
 def evaluate(profile: str, region: str, identity: dict | None) -> list[str]:
+    """Check CLI profile, region, and account. The ARN user or role name is not compared to the profile."""
     errors = []
-    if profile == REFUSED_PROFILE or profile.startswith(REFUSED_PROFILE):
-        errors.append("Refusing profile 6g.")
-    if profile != EXPECTED_PROFILE:
-        errors.append(f"Profile must be {EXPECTED_PROFILE}.")
+    if profile in REFUSED_PROFILES or profile.startswith("6g"):
+        if profile == "mfeng" or profile.startswith("mfeng"):
+            errors.append(
+                "CLI profile mfeng is not configured. Use --profile tp. "
+                "The IAM user name does not have to equal the CLI profile name."
+            )
+        else:
+            errors.append("Refusing CLI profile 6g. Use --profile tp.")
+    elif profile != EXPECTED_PROFILE:
+        errors.append(
+            "CLI profile must be tp. The profile name is not an IAM user name."
+        )
     if region != EXPECTED_REGION:
         errors.append(f"Region must be {EXPECTED_REGION}.")
     if identity is not None:
-        if str(identity.get("Account")) != EXPECTED_ACCOUNT:
-            errors.append(f"Account must be {EXPECTED_ACCOUNT}.")
+        account = str(identity.get("Account", ""))
         arn = str(identity.get("Arn", ""))
-        if EXPECTED_ACCOUNT not in arn:
-            errors.append("Caller ARN is not in the authorized account.")
+        if account != EXPECTED_ACCOUNT:
+            errors.append(f"Account must be {EXPECTED_ACCOUNT}.")
+        if f":{EXPECTED_ACCOUNT}:" not in arn and not arn.endswith(f":{EXPECTED_ACCOUNT}"):
+            errors.append("Caller ARN is not in account 544020760996.")
     return errors
 
 
@@ -46,7 +57,7 @@ def main(argv=None) -> int:
         identity = json.loads(args.identity_json)
     elif args.call_sts:
         if args.profile != EXPECTED_PROFILE:
-            print("Refusing STS call unless --profile mfeng is explicit.", file=sys.stderr)
+            print("Refusing STS call unless --profile tp is explicit.", file=sys.stderr)
             return 2
         import boto3
 
@@ -58,8 +69,10 @@ def main(argv=None) -> int:
         return 1
     if identity is None and not args.call_sts:
         print(
-            "Identity preflight is structurally valid for profile mfeng in us-west-2. "
-            "STS was not called. The parent executor must re-run with --call-sts before deploy."
+            "CLI profile tp and region us-west-2 match the expected local settings. "
+            "STS was not called, so the account was not checked. "
+            "Re-run with --call-sts before deploy. "
+            "The IAM principal name does not need to equal the CLI profile name."
         )
         return 0
     print(json.dumps({"account": identity.get("Account"), "arn": identity.get("Arn"), "region": args.region}))

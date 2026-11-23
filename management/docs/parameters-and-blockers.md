@@ -1,6 +1,6 @@
 # Parameters and blockers
 
-Target, when the parent deploys: account `544020760996`, region `us-west-2`, profile `mfeng`. This implementation did not call AWS and did not deploy.
+Target, when the parent deploys: account `544020760996`, region `us-west-2`, CLI profile `tp`. The profile name is not the IAM user name. This implementation did not call AWS and did not deploy.
 
 ## Required before the stack can be created
 

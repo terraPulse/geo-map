@@ -9,7 +9,7 @@ Rules:
   AuthorizedTarget:
     Assertions:
       - Assert: !Equals [!Ref "AWS::AccountId", "544020760996"]
-        AssertDescription: Deploy only in terraPulse account 544020760996 using profile mfeng. Do not use profile 6g.
+        AssertDescription: Deploy only in terraPulse account 544020760996. The executor CLI profile is tp. Do not use profile 6g.
       - Assert: !Equals [!Ref "AWS::Region", "us-west-2"]
         AssertDescription: Deploy only in us-west-2 (Oregon).
 

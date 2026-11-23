@@ -40,7 +40,8 @@ ROLES = (ROLE_ADMIN, ROLE_READER)
 
 AUTHORIZED_ACCOUNT = "544020760996"
 AUTHORIZED_REGION = "us-west-2"
-AUTHORIZED_PROFILE = "mfeng"
+# Existing CLI profile on the deploy host. This is not the IAM user name.
+AUTHORIZED_PROFILE = "tp"
 REFUSED_PROFILE = "6g"
 
 # Staging guard: this increment refuses to store live-system pointers.
