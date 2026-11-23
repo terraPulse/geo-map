@@ -44,9 +44,10 @@ class Settings:
         source_allowlist="",
         output_prefix="builds",
         max_build_tiles=32,
-        build_absolute_max=4096,
+        build_absolute_max=256,
         orchestrator="in-process",
         build_queue_url="",
+        s3_reads_enabled=False,
         renderer_mode="disabled",
         renderer_function_arn="",
         seed_fixtures,
@@ -77,6 +78,7 @@ class Settings:
         self.build_absolute_max = int(build_absolute_max)
         self.orchestrator = orchestrator or "in-process"
         self.build_queue_url = build_queue_url or ""
+        self.s3_reads_enabled = bool(s3_reads_enabled)
         self.renderer_mode = renderer_mode or "disabled"
         self.renderer_function_arn = renderer_function_arn or ""
         self.seed_fixtures = seed_fixtures
@@ -190,9 +192,10 @@ class Settings:
             source_allowlist=env.get("LAYER_MANAGER_SOURCE_ALLOWLIST", ""),
             output_prefix=env.get("LAYER_MANAGER_OUTPUT_PREFIX", "builds") or "builds",
             max_build_tiles=int(env.get("LAYER_MANAGER_MAX_BUILD_TILES", "32") or "32"),
-            build_absolute_max=int(env.get("LAYER_MANAGER_BUILD_ABSOLUTE_MAX", "4096") or "4096"),
+            build_absolute_max=int(env.get("LAYER_MANAGER_BUILD_ABSOLUTE_MAX", "256") or "256"),
             orchestrator=env.get("LAYER_MANAGER_ORCHESTRATOR", "in-process") or "in-process",
             build_queue_url=env.get("LAYER_MANAGER_BUILD_QUEUE_URL", ""),
+            s3_reads_enabled=_flag(env, "LAYER_MANAGER_S3_READS", "0"),
             renderer_mode=env.get("LAYER_MANAGER_RENDERER_MODE", "disabled") or "disabled",
             renderer_function_arn=env.get("LAYER_MANAGER_RENDERER_FUNCTION_ARN", ""),
             seed_fixtures=_flag(env, "LAYER_MANAGER_SEED_FIXTURES", seed_default),

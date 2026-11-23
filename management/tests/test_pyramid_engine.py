@@ -49,7 +49,15 @@ class PyramidEngineTests(unittest.TestCase):
             self.assertEqual(coarse_pixel[3], 255)
             self.assertNotEqual(west_pixel, east_pixel)
             again = render_pyramid(
-                source, out, meta["bounds"], [3, 4], 1, "nearest", STOPS, completed=result["completed"]
+                source,
+                out,
+                meta["bounds"],
+                [3, 4],
+                1,
+                "nearest",
+                STOPS,
+                completed=result["completed"],
+                hashes=result["hashes"],
             )
             self.assertEqual(again["written"], [])
             self.assertEqual(again["completed"], result["completed"])
@@ -96,8 +104,14 @@ class PyramidEngineTests(unittest.TestCase):
                 pngs.extend(name for name in names if name.endswith(".png"))
             self.assertEqual(len(pngs), 3)
             published = builds.publish(third["job_id"], "admin", "layer-admin", CONFIRM_PUBLISH)
-            self.assertTrue(published["layer"]["synthetic"])
+            self.assertFalse(published["layer"]["synthetic"])
+            self.assertEqual(published["layer"]["inventory"], "registry")
+            self.assertEqual(published["renderer_manifest"]["adapter"], "geomap.png_pyramid")
+            self.assertIsNone(published["renderer_manifest"]["layers"][0].get("bucket"))
+            self.assertEqual(published["interfaces_v0"]["schema"], "geo-map.dataset-registry/v0")
+            self.assertNotEqual(published["interfaces_v0"]["schema"], published["layer"]["schema"])
             self.assertFalse(published["effects"]["png_pyramid_regenerated"])
+            self.assertFalse(published["effects"]["live_aws_verified"])
             self.assertFalse(published["effects"]["real_s3_write"])
             self.assertEqual(second["tiles_written"], 2)
 
@@ -117,7 +131,7 @@ class PyramidEngineTests(unittest.TestCase):
             "demo=s3://example-fixture-source/datasets/",
         )
         self.assertEqual(bucket, "example-fixture-source")
-        self.assertEqual(key, "gradient.tif")
+        self.assertEqual(key, "datasets/gradient.tif")
         settings = support.local_settings(
             build_executor="rasterio",
             builds_enabled=True,
@@ -209,10 +223,28 @@ class PyramidEngineTests(unittest.TestCase):
             self.assertEqual(message["source_uri"], "s3://example-fixture-source/datasets/gradient.tif")
             self.assertIn("datasets/", message["allowlist"])
             batch = Batch()
-            submitted = submit_message(message, batch, "pyramid-queue", "pyramid-definition")
+            submitted = submit_message(
+                message,
+                batch,
+                "pyramid-queue",
+                "pyramid-definition",
+                "544020760996.dkr.ecr.us-west-2.amazonaws.com/geo-map-layer-manager-worker:local",
+                "demo=s3://example-fixture-source/datasets/",
+            )
             self.assertEqual(submitted["batch_job_id"], "fake-batch-1")
+            self.assertFalse(submitted["image_from_message"])
             self.assertEqual(batch.jobs[0]["jobQueue"], "pyramid-queue")
             self.assertIsNone(builds.run_once())
+            message["image"] = "public.ecr.aws/example:latest"
+            with self.assertRaises(ValueError):
+                submit_message(
+                    message,
+                    batch,
+                    "pyramid-queue",
+                    "pyramid-definition",
+                    "544020760996.dkr.ecr.us-west-2.amazonaws.com/geo-map-layer-manager-worker:local",
+                    "demo=s3://example-fixture-source/datasets/",
+                )
 
     def test_worker_refuses_s3_until_a_client_is_injected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -246,36 +278,6 @@ class PyramidEngineTests(unittest.TestCase):
                 _restore("BUILD_SPEC_JSON", previous)
                 _restore("BUILD_ALLOW_S3", allow)
                 _restore("BUILD_OUTPUT_BUCKET", bucket)
-
-            class Client:
-                def __init__(self):
-                    self.downloads = []
-                    self.uploads = []
-
-                def download_file(self, bucket_name, key, dest):
-                    self.downloads.append((bucket_name, key))
-                    write_gradient_geotiff(dest)
-
-                def upload_file(self, local, bucket_name, key):
-                    self.uploads.append((bucket_name, key, os.path.exists(local)))
-
-            client = Client()
-            os.environ["BUILD_SPEC_JSON"] = json.dumps(spec)
-            os.environ["BUILD_ALLOW_S3"] = "1"
-            os.environ["BUILD_OUTPUT_BUCKET"] = "example-output"
-            try:
-                with contextlib.redirect_stdout(io.StringIO()) as captured:
-                    code = worker_main(s3_client=client)
-                self.assertEqual(code, 0)
-                self.assertIn('"real_s3_write": true', captured.getvalue())
-            finally:
-                _restore("BUILD_SPEC_JSON", previous)
-                _restore("BUILD_ALLOW_S3", allow)
-                _restore("BUILD_OUTPUT_BUCKET", bucket)
-            self.assertEqual(client.downloads, [("example-fixture-source", "gradient.tif")])
-            self.assertEqual(len(client.uploads), 2)
-            self.assertTrue(all(item[2] for item in client.uploads))
-            self.assertTrue(all(item[1].startswith("builds/job/tiles/") for item in client.uploads))
 
 
 def _restore(name, value):

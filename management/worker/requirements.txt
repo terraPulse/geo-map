@@ -1,3 +1,4 @@
 rasterio==1.4.3
 pillow==11.0.0
 numpy==1.26.4
+boto3==1.35.90

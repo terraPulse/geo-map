@@ -38,16 +38,20 @@
       el("h3", { text: "Plan a stored PNG block pyramid" })
     );
     const source = el("select", { id: "build-source" });
-    form.appendChild(el("label", { for: "build-source", text: "Dataset" }));
+    form.appendChild(el("label", { for: "build-source", text: "Configured dataset" }));
     form.appendChild(source);
+    const prefix = el("p", { id: "build-prefix", className: "note", text: "No source prefix is configured." });
+    form.appendChild(prefix);
+    const key = field(el, form, "Object key under that prefix", "build-key", "");
     const tag = field(el, form, "Layer id", "build-tag", "demo/built/fixture");
     const zooms = field(el, form, "Stored zooms", "build-zooms", "2");
     const merge = field(el, form, "Block merge (1-8)", "build-merge", "1");
+    const inspect = el("button", { type: "button", text: "Inspect metadata" });
     const planButton = el("button", { type: "button", text: "Estimate plan" });
     const queue = el("button", { type: "submit", text: "Queue build", disabled: "disabled" });
     const phrase = field(el, form, "Type queue-build to confirm", "build-phrase", "");
     const report = el("div", { id: "build-report" });
-    form.appendChild(el("div", { className: "actions" }, planButton, queue));
+    form.appendChild(el("div", { className: "actions" }, inspect, planButton, queue));
     form.appendChild(report);
     page.appendChild(status);
     page.appendChild(preview);
@@ -59,12 +63,44 @@
     status.appendChild(el("p", { text: "Real builds enabled: " + config.real_builds_enabled + ". Executor: " + config.executor + "." }));
     const sources = await call("GET", "/v1/builds/sources");
     sources.sources.forEach(function (item) {
-      const label = item.title + (item.kind === "fixture-offline" ? " (offline fixture)" : " (allowlisted)");
-      source.appendChild(el("option", { value: item.id, text: label }));
+      const label = item.kind === "s3" ? item.id + " prefix " + item.uri : item.title + " (" + item.kind + ", not an S3 object)";
+      const option = el("option", { value: item.id, text: label });
+      option.setAttribute("data-kind", item.kind);
+      option.setAttribute("data-uri", item.uri || "");
+      source.appendChild(option);
     });
     if (!sources.sources.length) {
       source.appendChild(el("option", { value: "", text: "No dataset is configured" }));
     }
+    function selectedSource() {
+      return source.options[source.selectedIndex] || null;
+    }
+    function showPrefix() {
+      const current = selectedSource();
+      if (!current || current.getAttribute("data-kind") !== "s3") {
+        prefix.textContent = "This entry is not an S3 prefix. Metadata is not read from a bucket.";
+        return;
+      }
+      prefix.textContent = "Only objects under " + current.getAttribute("data-uri") + " can be named. Other buckets are rejected.";
+    }
+    source.addEventListener("change", showPrefix);
+    showPrefix();
+    inspect.addEventListener("click", async function () {
+      const current = selectedSource();
+      report.textContent = "";
+      if (!current || current.getAttribute("data-kind") !== "s3") {
+        report.appendChild(el("p", { text: "Inspect applies to a configured S3 prefix. No bucket was read." }));
+        return;
+      }
+      try {
+        const info = await call("POST", "/v1/builds/inspect", { source_id: current.value, key: key.value.trim() });
+        report.appendChild(el("h3", { text: "Source metadata" }));
+        report.appendChild(el("p", { text: "status " + (info.status || "ok") + ", read_s3 " + info.read_s3 + ", crs " + info.crs + ", nodata " + info.nodata + "." }));
+        report.appendChild(el("p", { text: info.message || "Bounds were read from the object the configured reader returned." }));
+      } catch (error) {
+        report.appendChild(el("p", { text: error.message }));
+      }
+    });
 
     let digest = null;
     planButton.addEventListener("click", async function () {
@@ -74,7 +110,7 @@
         queue.disabled = !plan.submittable;
         report.textContent = "";
         report.appendChild(el("h3", { text: "Approximate plan" }));
-        report.appendChild(el("p", { text: "Tiles " + plan.tile_count + ", pixels " + plan.pixel_estimate + ", upper storage bytes " + plan.storage_bytes_upper + ". Approximate: " + plan.approximate + "." }));
+        report.appendChild(el("p", { text: "Blocks " + plan.tile_count + " in batches of " + plan.batch_size + " (absolute max " + plan.absolute_max + "). This is not a measured global pyramid." }));
         report.appendChild(el("p", { text: plan.submittable ? "This plan can be queued." : "Not queued. " + (plan.reason || "") }));
         ctx.say(plan.submittable ? "Plan ready. Nothing has been built." : "Plan was not queued.");
       } catch (error) {
@@ -101,6 +137,7 @@
   function draft() {
     return {
       source_id: document.getElementById("build-source").value,
+      key: document.getElementById("build-key").value.trim() || undefined,
       tag: document.getElementById("build-tag").value.trim(),
       title: "Fixture build " + document.getElementById("build-tag").value.trim(),
       zooms: document.getElementById("build-zooms").value.split(/[^0-9]+/).filter(Boolean).map(Number),
@@ -114,7 +151,7 @@
     for (let i = 0; i < 20; i += 1) {
       const result = await call("GET", "/v1/builds/item?job_id=" + encodeURIComponent(jobId));
       const job = result.job;
-      report.appendChild(el("p", { text: job.status + " " + job.progress.completed_tiles + "/" + job.progress.total_tiles + " (" + job.execution_mode + ")" }));
+      report.appendChild(el("p", { text: "Job record: " + job.status + " " + job.progress.completed_tiles + "/" + job.progress.total_tiles + " (" + job.execution_mode + "). This page does not invent progress." }));
       if (job.status === "succeeded" || job.status === "failed" || job.status === "cancelled") {
         ctx.say(job.status + ". Real S3 write: " + job.real_s3_write);
         return;

@@ -80,6 +80,11 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(self.template["Parameters"]["BuildSecurityGroupId"]["Default"], "")
         self.assertIn("BuildInfra", self.template["Conditions"])
         self.assertNotIn("s3:DeleteObject", self.text)
+        self.assertIn("iam:PassRole", self.text)
+        self.assertIn("ecs-tasks.amazonaws.com", self.text)
+        self.assertIn("geo-map-layer-manager-worker", self.template["Parameters"]["BuildImageUri"]["AllowedPattern"])
+        self.assertIn("awslogs", self.text)
+        self.assertEqual(self.template["Resources"]["ApiFunction"]["Properties"]["Environment"]["Variables"]["LAYER_MANAGER_BUILD_ABSOLUTE_MAX"], "256")
         self.assertEqual(self.template["Resources"]["ApiLogGroup"]["Properties"]["RetentionInDays"], 14)
         log_format = self.template["Resources"]["ApiStage"]["Properties"]["AccessLogSettings"]["Format"]
         self.assertNotIn("authorization", log_format.lower())

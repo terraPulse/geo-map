@@ -21,6 +21,10 @@ Rules:
         AssertDescription: Deploy only in terraPulse account 544020760996. The executor CLI profile is tp. Do not use profile 6g.
       - Assert: !Equals [!Ref "AWS::Region", "us-west-2"]
         AssertDescription: Deploy only in us-west-2 (Oregon).
+      - Assert: !Equals [!Select [0, !Split ["geo-map-tiles", !Ref SourceBucketName]], !Ref SourceBucketName]
+        AssertDescription: SourceBucketName must not refer to a production tile bucket.
+      - Assert: !Equals [!Select [0, !Split ["map-tiles-dev", !Ref SourceBucketName]], !Ref SourceBucketName]
+        AssertDescription: SourceBucketName must not refer to map-tiles-dev.
 
 Parameters:
   ProjectName:
@@ -102,8 +106,8 @@ Parameters:
   BuildImageUri:
     Type: String
     Default: ""
-    AllowedPattern: "^$|^[A-Za-z0-9._:/@-]{1,255}$"
-    Description: Container image for the raster worker. Empty keeps Batch out of the stack. This template does not build or push the image.
+    AllowedPattern: "^$|^544020760996\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com/geo-map-layer-manager-worker:[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    Description: ECR image in this account only. Empty keeps Batch out of the stack. The tag latest is rejected by the submitter. This template does not build or push the image.
   BuildSubnetIds:
     Type: String
     Default: ""
@@ -498,13 +502,14 @@ Resources:
           LAYER_MANAGER_BUILD_EXECUTOR: !If [BuildInfra, "rasterio", "disabled"]
           LAYER_MANAGER_ORCHESTRATOR: !If [BuildInfra, "batch", "in-process"]
           LAYER_MANAGER_BUILD_QUEUE_URL: !If [BuildInfra, !Ref BuildQueue, ""]
+          LAYER_MANAGER_S3_READS: !If [BuildInfra, "true", "false"]
           LAYER_MANAGER_SOURCE_ALLOWLIST: !If
             - RealBuilds
             - !Sub "datasets=s3://${SourceBucketName}/${SourceKeyPrefix}"
             - ""
           LAYER_MANAGER_OUTPUT_PREFIX: builds
           LAYER_MANAGER_MAX_BUILD_TILES: "32"
-          LAYER_MANAGER_BUILD_ABSOLUTE_MAX: "4096"
+          LAYER_MANAGER_BUILD_ABSOLUTE_MAX: "256"
 
   RendererInvokePolicy:
     Type: AWS::IAM::Policy
@@ -755,11 +760,21 @@ Resources:
         JobRoleArn: !GetAtt BuildJobRole.Arn
         NetworkConfiguration:
           AssignPublicIp: ENABLED
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Ref BuildJobLogGroup
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: pyramid
         Environment:
           - Name: BUILD_ALLOW_S3
             Value: "1"
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
           - Name: BUILD_OUTPUT_BUCKET
             Value: !Ref BuildOutputBucket
+          - Name: BUILD_SOURCE_ALLOWLIST
+            Value: !Sub "datasets=s3://${SourceBucketName}/${SourceKeyPrefix}"
 
   BuildSubmitterRole:
     Type: AWS::IAM::Role
@@ -791,12 +806,27 @@ Resources:
                 Resource:
                   - !Ref BuildJobQueue
                   - !Ref BuildJobDefinition
+              - Sid: PassKnownTaskRoles
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !GetAtt BuildJobRole.Arn
+                  - !GetAtt BuildExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ecs-tasks.amazonaws.com
               - Sid: WriteSubmitterLogs
                 Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub "${BuildSubmitterLogGroup.Arn}:*"
+
+  BuildJobLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: BuildInfra
+    Properties:
+      RetentionInDays: 14
 
   BuildSubmitterLogGroup:
     Type: AWS::Logs::LogGroup
@@ -825,6 +855,8 @@ Resources:
         Variables:
           BUILD_JOB_QUEUE: !Ref BuildJobQueue
           BUILD_JOB_DEFINITION: !Ref BuildJobDefinition
+          BUILD_IMAGE_URI: !Ref BuildImageUri
+          BUILD_SOURCE_ALLOWLIST: !Sub "datasets=s3://${SourceBucketName}/${SourceKeyPrefix}"
 
   BuildSubmitMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -833,6 +865,21 @@ Resources:
       EventSourceArn: !GetAtt BuildQueue.Arn
       FunctionName: !Ref BuildSubmitter
       BatchSize: 1
+
+  ApiSourceReadPolicy:
+    Type: AWS::IAM::Policy
+    Condition: BuildInfra
+    Properties:
+      PolicyName: read-allowlisted-source
+      Roles:
+        - !Ref ApiRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ReadSourceObject
+            Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${SourceBucketName}/${SourceKeyPrefix}*"
 
   ApiBuildEnqueuePolicy:
     Type: AWS::IAM::Policy

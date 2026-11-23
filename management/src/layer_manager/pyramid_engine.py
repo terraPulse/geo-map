@@ -6,6 +6,7 @@ injected fetcher after the URI passes the allowlist. This module does not
 create a boto3 client.
 """
 
+import hashlib
 import os
 
 from .png_codec import png_size
@@ -105,7 +106,23 @@ def describe_raster(path):
         }
 
 
-def render_pyramid(source_path, output_dir, bounds, zooms, merge, resampling, stops, completed=None, batch_size=None, should_continue=None):
+def sha256_bytes(blob):
+    return hashlib.sha256(blob).hexdigest()
+
+
+def render_pyramid(
+    source_path,
+    output_dir,
+    bounds,
+    zooms,
+    merge,
+    resampling,
+    stops,
+    completed=None,
+    hashes=None,
+    batch_size=None,
+    should_continue=None,
+):
     require_rasterio()
     import rasterio
     from PIL import Image
@@ -115,14 +132,20 @@ def render_pyramid(source_path, output_dir, bounds, zooms, merge, resampling, st
         raise PyramidError("resampling", "resampling must be nearest, bilinear, or cubic.")
     method = {"nearest": Resampling.nearest, "bilinear": Resampling.bilinear, "cubic": Resampling.cubic}[resampling]
     blocks = iter_blocks(bounds, zooms, merge)
-    done = set(completed or [])
-    remaining = [block for block in blocks if _relative(block) not in done]
+    known = _known_hashes(completed, hashes)
+    remaining = []
+    for block in blocks:
+        relative = _relative(block)
+        if relative not in known:
+            remaining.append(block)
+            continue
+        _require_matching_file(os.path.join(output_dir, relative), relative, known[relative])
     batch = remaining if batch_size is None else remaining[: int(batch_size)]
     written = []
     with rasterio.open(source_path) as source:
         for block in batch:
             if should_continue is not None and not should_continue():
-                return {"written": written, "stopped": True, "total": len(blocks), "completed": sorted(done)}
+                return _result(written, True, blocks, known)
             relative = _relative(block)
             array = _sample(source, block, method)
             image = _colorize(array, stops, source.nodata)
@@ -135,9 +158,41 @@ def render_pyramid(source_path, output_dir, bounds, zooms, merge, resampling, st
                 raise PyramidError("png_size", f"{relative} is not {block['width']} pixels.")
             if block["width"] % TILE_PX or block["height"] % TILE_PX:
                 raise PyramidError("png_size", "block edge is not a multiple of 256.")
-            done.add(relative)
+            known[relative] = sha256_bytes(blob)
             written.append(relative)
-    return {"written": written, "stopped": False, "total": len(blocks), "completed": sorted(done)}
+    return _result(written, False, blocks, known)
+
+
+def _known_hashes(completed, hashes):
+    if isinstance(completed, dict):
+        return dict(completed)
+    hashes = dict(hashes or {})
+    return {path: hashes[path] for path in (completed or []) if path in hashes}
+
+
+def _require_matching_file(path, relative, expected):
+    if not os.path.isfile(path):
+        raise PyramidError(
+            "tile_hash_mismatch",
+            f"{relative} is checkpointed but the file is missing. It was not treated as done.",
+        )
+    with open(path, "rb") as handle:
+        actual = sha256_bytes(handle.read())
+    if actual != expected:
+        raise PyramidError(
+            "tile_hash_mismatch",
+            f"{relative} hash does not match the checkpoint. The file was not replaced.",
+        )
+
+
+def _result(written, stopped, blocks, known):
+    return {
+        "written": written,
+        "stopped": stopped,
+        "total": len(blocks),
+        "completed": sorted(known),
+        "hashes": dict(known),
+    }
 
 
 def _relative(block):

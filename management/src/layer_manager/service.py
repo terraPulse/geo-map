@@ -17,6 +17,7 @@ from .schema_contract import (
     CONFIRM_IMPORT,
     CONFIRM_PUBLISH,
     CONFIRM_RESTORE,
+    INVENTORY_REGISTRY,
     INVENTORY_SYNTHETIC,
     ROLE_ADMIN,
     STATUS_DRAFT,
@@ -239,6 +240,25 @@ class LayerService:
             record["status"] = STATUS_DRAFT
         saved = self._commit_update(current, record, expected_revision, actor, role, "restore")
         return self._write_result(saved)
+
+    def register_validated_output(self, layer, actor, role):
+        """Store a validated build as a registry record. It is not a synthetic fixture."""
+        incoming = clone(layer)
+        incoming.pop("status", None)
+        incoming.pop("synthetic", None)
+        normalized, issues = self._ready(incoming)
+        if publish_blockers(issues):
+            raise ValidationFailed("The build output is not publishable.", publish_blockers(issues))
+        return self._store_new(
+            normalized,
+            issues,
+            actor=actor,
+            role=role,
+            status=STATUS_PUBLISHED,
+            synthetic=False,
+            action="register-build-output",
+            inventory=INVENTORY_REGISTRY,
+        )
 
     def seed_fixture(self, layer, actor, role):
         """Internal seed path. Forces the synthetic inventory label."""

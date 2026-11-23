@@ -8,8 +8,10 @@ import uuid
 from .build_allow import output_prefix_for, parse_allowlist, resolve_key
 from .canonical import content_digest, utcnow
 from .errors import Conflict, NotFound, ValidationFailed
+from .interfaces_export import export_dataset_v0
 from .png_codec import encode_rgba, png_size
 from .pyramid_engine import PyramidError, describe_raster, render_pyramid, write_gradient_geotiff
+from .renderer_manifest import renderer_manifest
 from .schema_contract import CONFIRM_PUBLISH, CONFIRM_QUEUE_BUILD
 from .tile_math import MAX_MERGE, count_tiles
 from .validate import digest_input, structural_errors, validate_client_layer, validate_tag
@@ -81,13 +83,14 @@ def json_copy(value):
 
 
 class BuildService:
-    def __init__(self, store, settings, layer_service, output_root, source_fetch=None, queue_client=None):
+    def __init__(self, store, settings, layer_service, output_root, source_fetch=None, queue_client=None, s3_client=None):
         self.store = store
         self.settings = settings
         self.layers = layer_service
         self.output_root = output_root
         self.source_fetch = source_fetch
         self.queue_client = queue_client
+        self.s3_client = s3_client
         self._lock = threading.Lock()
 
     def config(self):
@@ -128,7 +131,12 @@ class BuildService:
             raise ValidationFailed("An object key is required for an S3 source.", [])
         uri = resolve_key(source["uri"], key)
         if self.settings.build_executor == "rasterio":
-            if self.source_fetch is None:
+            client = self.s3_client
+            if client is None and self.settings.s3_reads_enabled:
+                from .s3_source import s3_client_from_environment
+
+                client = s3_client_from_environment()
+            if client is None and self.source_fetch is None:
                 return {
                     "source_id": source_id,
                     "uri": uri,
@@ -142,12 +150,21 @@ class BuildService:
                     "read_s3": False,
                     "message": "No S3 reader is configured. The object was not fetched and no metadata was invented.",
                 }
-            path = self.source_fetch(uri)
+            if self.source_fetch is not None and client is None:
+                path = self.source_fetch(uri)
+            else:
+                import tempfile
+
+                from .s3_source import download_allowlisted
+
+                path = download_allowlisted(uri, self.settings.source_allowlist_text, tempfile.mkdtemp(prefix="inspect-"), client)
             info = describe_raster(path)
             info["source_id"] = source_id
             info["uri"] = uri
             info["key"] = key
             info["status"] = "inspected"
+            info["read_s3"] = client is not None
+            info["live_aws_verified"] = False
             return info
         runtime = probe_builder()
         if not runtime["gio_importable"] or not runtime["gdal_importable"]:
@@ -265,7 +282,9 @@ class BuildService:
             "logs": [{"at": utcnow(), "message": "queued"}],
             "tiles_written": 0,
             "completed": [],
-            "output_validation": {"ok": False, "real_s3": False},
+            "tile_hashes": {},
+            "live_aws_verified": False,
+            "output_validation": {"ok": False, "real_s3": False, "live_aws_verified": False},
             "created_at": utcnow(),
             "updated_at": utcnow(),
         }
@@ -292,7 +311,7 @@ class BuildService:
             "stops": list(RASTER_STOPS),
             "output_prefix": job["output_prefix"],
             "batch_size": job["plan"].get("batch_size"),
-            "completed": [],
+            "hashes": job.get("tile_hashes") or {},
         }
         client.send_message(QueueUrl=self.settings.build_queue_url or "configured", MessageBody=json.dumps(body))
         job["logs"].append({"at": utcnow(), "message": "enqueued for Batch"})
@@ -359,6 +378,8 @@ class BuildService:
         job = self._require(job_id)
         if job["status"] != "succeeded" or not job["output_validation"].get("ok"):
             raise Conflict("Only a validated successful build can be published.", [])
+        if job.get("live_aws_verified") or job["output_validation"].get("live_aws_verified"):
+            raise Conflict("This process cannot mark a build as live-verified.", [])
         layer_body = {
             "tag": job["plan"]["tag"],
             "title": job["plan"]["title"],
@@ -367,8 +388,8 @@ class BuildService:
                 "layout": "version-2-tiles",
                 "tile_pixel_size": 256,
                 "tile_merge": job["plan"]["tile_merge"],
-                "min_static_level": job["plan"]["zooms"][0],
-                "min_dynamic_level": job["plan"]["zooms"][-1],
+                "min_static_level": min(job["plan"]["zooms"]),
+                "min_dynamic_level": max(job["plan"]["zooms"]),
                 "processed_levels": job["plan"]["zooms"],
                 "version": 2.0,
                 "aggregate": job["plan"]["aggregate"],
@@ -376,13 +397,18 @@ class BuildService:
             },
             "cog": None,
             "bounds": job["plan"].get("bounds") or FIXTURE_SOURCE["inspection"]["bounds"],
-            "style": {"type": "color-ramp", "stops": [{"value": 0, "rgba": [70, 130, 180, 255], "label": "fixture"}]},
-            "nodata": {"min_value": None, "max_value": None, "fill_nodata": None, "raster_nodata": None},
+            "style": _publish_style(job),
+            "nodata": {
+                "min_value": None,
+                "max_value": None,
+                "fill_nodata": None,
+                "raster_nodata": -9999 if job["execution_mode"] == "rasterio" else None,
+            },
             "source_revisions": [
                 {
                     "revision_id": job["job_id"][:12],
-                    "uri": job["source"].get("uri") or "synthetic://fixture/build/" + job["job_id"],
-                    "note": job["execution_mode"] + " output. Not a production tile bucket write.",
+                    "uri": _publish_uri(job),
+                    "note": "Validated worker output. Not a live inventory check and not the production tile bucket.",
                     "recorded_at": utcnow(),
                 }
             ],
@@ -391,17 +417,70 @@ class BuildService:
         normalized, issues = validate_client_layer(layer_body)
         if structural_errors(issues):
             raise ValidationFailed("Build metadata is not publishable.", structural_errors(issues))
-        stored = self.layers.seed_fixture({**layer_body, "status": "published"}, actor=actor, role=role)
+        if job["execution_mode"] == "rasterio":
+            stored = self.layers.register_validated_output(layer_body, actor=actor, role=role)
+            manifest = renderer_manifest(job)
+            exported = export_dataset_v0(stored)
+            synthetic = False
+        else:
+            stored = self.layers.seed_fixture({**layer_body, "status": "published"}, actor=actor, role=role)
+            manifest = None
+            exported = None
+            synthetic = True
         return {
             "layer": stored,
+            "renderer_manifest": manifest,
+            "interfaces_v0": exported,
+            "schema_gap": "Stored record is geo-map.layer-registry.v1. interfaces_v0 is a separate export, not the stored document.",
             "effects": {
                 "registry_updated": True,
                 "png_pyramid_regenerated": False,
-                "real_s3_write": False,
+                "real_s3_write": bool(job.get("real_s3_write")),
+                "live_aws_verified": False,
                 "execution_mode": job["execution_mode"],
             },
-            "build": {"job_id": job["job_id"], "real_s3_write": False, "synthetic": True},
+            "build": {
+                "job_id": job["job_id"],
+                "real_s3_write": bool(job.get("real_s3_write")),
+                "live_aws_verified": False,
+                "synthetic": synthetic,
+            },
         }
+
+    def apply_worker_report(self, job_id, payload):
+        job = self._require(job_id)
+        if job["status"] in {"succeeded", "failed", "cancelled"}:
+            raise Conflict("This build is already finished.", [])
+        job["live_aws_verified"] = False
+        job["real_s3_write"] = bool(payload.get("real_s3_write"))
+        job["output_bucket"] = payload.get("output_bucket")
+        hashes = payload.get("hashes") or {}
+        completed = payload.get("completed") or []
+        matched = payload.get("ok") and completed and len(completed) == payload.get("total") and all(path in hashes for path in completed)
+        if not matched:
+            job["status"] = "cancelled" if payload.get("stopped") else "failed"
+            job["error"] = {
+                "code": payload.get("code") or "worker_failed",
+                "message": payload.get("message") or "The worker did not validate every block.",
+            }
+            job["output_validation"] = {"ok": False, "real_s3": False, "live_aws_verified": False}
+        else:
+            job["status"] = "succeeded"
+            job["tile_hashes"] = hashes
+            job["completed"] = completed
+            job["tiles_written"] = len(completed)
+            job["progress"] = {"completed_tiles": len(completed), "total_tiles": payload["total"], "fraction": 1}
+            job["output_validation"] = {
+                "ok": True,
+                "real_s3": job["real_s3_write"],
+                "live_aws_verified": False,
+                "engine": "rasterio",
+                "png_blocks": len(completed),
+                "sha256": hashes,
+            }
+        job["logs"].append({"at": utcnow(), "message": job["status"] + " from worker report"})
+        job["updated_at"] = utcnow()
+        return self.store.save(job)
 
     def _run_fixture(self, job):
         total = job["plan"]["tile_count"]
@@ -550,6 +629,7 @@ class BuildService:
                 job["plan"]["resampling"],
                 list(RASTER_STOPS),
                 completed=job.get("completed") or [],
+                hashes=job.get("tile_hashes") or {},
                 batch_size=job["plan"].get("batch_size") or self.settings.max_build_tiles,
                 should_continue=should_continue,
             )
@@ -563,6 +643,7 @@ class BuildService:
             return self.store.save(job)
         current = self.store.get(job["job_id"])
         current["completed"] = result["completed"]
+        current["tile_hashes"] = result["hashes"]
         current["tiles_written"] = len(result["completed"])
         current["real_s3_write"] = False
         total = result["total"] or 1
@@ -590,6 +671,19 @@ class BuildService:
             }
         current["updated_at"] = utcnow()
         return self.store.save(current)
+
+
+def _publish_style(job):
+    if job["execution_mode"] == "rasterio":
+        return {"type": "color-ramp", "stops": [{**stop, "label": "ramp"} for stop in RASTER_STOPS]}
+    return {"type": "color-ramp", "stops": [{"value": 0, "rgba": [70, 130, 180, 255], "label": "fixture"}]}
+
+
+def _publish_uri(job):
+    bucket = job.get("output_bucket")
+    if job.get("real_s3_write") and bucket:
+        return f"s3://{bucket}/builds/{job['job_id']}/"
+    return "synthetic://fixture/build/" + job["job_id"]
 
 
 def _execution_mode(kind, executor):

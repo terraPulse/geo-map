@@ -27,7 +27,7 @@ These stay empty, so the default stack update does not create them. See `managem
 | --- | --- |
 | `EnableBuilds` | Default `false`. The API executor stays `disabled` and does not render. |
 | `SourceBucketName` and `SourceKeyPrefix` | Read-only allowlist. A tile bucket is refused. |
-| `BuildImageUri` | No image was built here. Docker is not installed on the cloud agent. |
+| `BuildImageUri` | Must be `544020760996.dkr.ecr.us-west-2.amazonaws.com/geo-map-layer-manager-worker:<tag>`. `latest` and other registries are rejected. No image was built here. |
 | `BuildSubnetIds` | At least one subnet. Public subnets avoid a NAT gateway. |
 | `BuildSecurityGroupId` | Security group for the Fargate task. |
 

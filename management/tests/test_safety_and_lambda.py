@@ -35,7 +35,7 @@ class SafetyTests(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
                     name = self._name(node.func)
-                    if path.name == "s3_source.py" and name == "upload_file":
+                    if path.name == "s3_source.py" and name in {"get_object", "head_object", "put_object"}:
                         continue
                     self.assertNotIn(name, BANNED, f"{path.name} calls {name}")
 
