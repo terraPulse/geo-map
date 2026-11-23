@@ -542,6 +542,17 @@ Resources:
       AuthorizerId: !Ref ApiAuthorizer
       Target: !Sub "integrations/${ApiIntegration}"
 
+  # OPTIONS matches ANY and was invoking the JWT authorizer, so browser
+  # preflight received 401. This route is only the preflight. It returns
+  # no registry data. GET, POST, and PATCH stay on ApiRoute.
+  OptionsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "OPTIONS /v1/{proxy+}"
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${ApiIntegration}"
+
   ApiStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:

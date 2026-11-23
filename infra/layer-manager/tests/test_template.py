@@ -58,6 +58,10 @@ class TemplateTests(unittest.TestCase):
         route = self.template["Resources"]["ApiRoute"]["Properties"]
         self.assertEqual(route["AuthorizationType"], "JWT")
         self.assertEqual(route["RouteKey"], "ANY /v1/{proxy+}")
+        options = self.template["Resources"]["OptionsRoute"]["Properties"]
+        self.assertEqual(options["AuthorizationType"], "NONE")
+        self.assertEqual(options["RouteKey"], "OPTIONS /v1/{proxy+}")
+        self.assertNotIn("AuthorizerId", options)
         origins = self.template["Resources"]["HttpApi"]["Properties"]["CorsConfiguration"]["AllowOrigins"]
         self.assertNotIn("*", origins)
         self.assertIn("Distribution.DomainName", str(origins[0]))

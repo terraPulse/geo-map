@@ -44,6 +44,17 @@ class LocalHandler(BaseHTTPRequestHandler):
         self._route()
 
     def do_OPTIONS(self):
+        parts = urlsplit(self.path)
+        if parts.path.startswith("/v1/"):
+            status, headers, payload = self.api.handle(
+                "OPTIONS",
+                parts.path,
+                {},
+                {key: value for key, value in self.headers.items()},
+                b"",
+            )
+            self._send(status, headers.get("content-type", "text/plain"), payload, headers)
+            return
         origin = self.headers.get("Origin")
         if origin and origin in self.settings.cors_origins:
             self.send_response(204)

@@ -15,6 +15,8 @@ from .schema_contract import SCHEMA_ID
 from .service import LayerService
 
 MAX_BODY = 256 * 1024
+PREFLIGHT_METHODS = ("GET", "POST", "PATCH", "OPTIONS")
+PREFLIGHT_HEADERS = ("authorization", "content-type")
 
 _WRITES = {
     ("POST", "/v1/layers"),
@@ -49,6 +51,8 @@ class Api:
         try:
             if len(body or b"") > MAX_BODY:
                 raise PayloadTooLarge("JSON body exceeds 256 KiB.")
+            if method == "OPTIONS" and path.startswith("/v1/"):
+                return self._preflight(headers)
             actor = authenticate(headers, apigateway_event, self.settings, now=now)
             if (method, path) in _WRITES:
                 require_writer(actor)
@@ -213,6 +217,39 @@ class Api:
             )
         return 404, None
 
+    def _preflight(self, headers):
+        """Browser preflight only. No registry data and no JWT."""
+        origin = _header(headers, "origin")
+        requested_method = _header(headers, "access-control-request-method").upper()
+        requested_headers = _header(headers, "access-control-request-headers")
+        allowed = set(PREFLIGHT_HEADERS)
+        if self.settings.allow_fixture_auth:
+            allowed.add("x-layer-manager-fixture-actor")
+        bad = (
+            not origin
+            or origin not in self.settings.cors_origins
+            or requested_method not in PREFLIGHT_METHODS
+            or not _requested_headers_allowed(requested_headers, allowed)
+        )
+        response_headers = {
+            "cache-control": "no-store",
+            "x-content-type-options": "nosniff",
+            "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+        }
+        if bad:
+            response_headers["content-type"] = "application/json; charset=utf-8"
+            body = b'{"ok":false,"error":{"code":"cors_preflight","message":"Preflight origin, method, or header is not allowed."}}'
+            return 403, response_headers, body
+        response_headers["access-control-allow-methods"] = ", ".join(PREFLIGHT_METHODS)
+        response_headers["access-control-allow-headers"] = ", ".join(sorted(allowed))
+        response_headers["access-control-max-age"] = "600"
+        # Always name the one matched origin. Staging leaves emit_cors off so
+        # ordinary responses stay with API Gateway's CORS config; a successful
+        # preflight still has to be a 2xx with this header if the gateway does
+        # not add it itself.
+        response_headers["access-control-allow-origin"] = origin
+        return 204, response_headers, b""
+
     def _session(self, actor):
         banner = (
             "Local fixture identity. Synthetic fixtures are not the live tile inventory."
@@ -282,10 +319,21 @@ def _tag(query, payload):
 
 
 def _origin(headers):
+    return _header(headers, "origin")
+
+
+def _header(headers, name):
     for key, value in (headers or {}).items():
-        if key.lower() == "origin":
+        if str(key).lower() == name and isinstance(value, str):
             return value
-    return None
+    return ""
+
+
+def _requested_headers_allowed(header_value, allowed):
+    if not header_value:
+        return True
+    requested = {part.strip().lower() for part in header_value.split(",") if part.strip()}
+    return requested <= allowed
 
 
 def query_from_string(raw):
