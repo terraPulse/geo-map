@@ -41,3 +41,7 @@ Do not add these trees in renderer fixes:
 - `interfaces/` — additive WMS, TileJSON, MCP, and data API
 
 Those surfaces should call the tile orders above, or read the same `setting.ini` and PNG keys, instead of growing a second renderer.
+
+## Test Lambda the management preview can call
+
+`deploy/tile_pyramid_test/` is a separate read-only Function URL, not the legacy `lambda/handler.py` generator. Adapter id `geomap.png_pyramid` version `1.0.0`. The management app should list layers from `GET /tiletest/v1/layers` and request tiles only by those ids. It does not pass S3 URLs. Details are in `doc/tile_pyramid_test_lambda.md`.
