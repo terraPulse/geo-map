@@ -3,6 +3,7 @@ File: map_tile_merge.py
 Author: Min Feng
 Description: merge the map tiles to reduce number of files
 '''
+import os
 from . import map_tile_task
 from . import map_tile
 
@@ -41,12 +42,16 @@ class tile_merge:
         _sy = _bb['y1'] - tile_tar.row
 
         _da = map_tile_task.map_tile_task().read(met, d_inp, tag, tile_src.tile)
+        if not _da:
+            return None
 
-        from PIL import Image
-        import io
-
-        _ii = Image.open(io.BytesIO(_da))
-        return loc_image((_sx * 256, _sy * 256), _ii.crop(self.make_box(_bb, tile_src)))
+        from .tile_runtime import get_cache
+        _version = met.get('version', 1.0)
+        _key = tile_src.tile.png_path(os.path.join(d_inp, tag), _version)
+        _crop = get_cache().crop_png(_key, _da, self.make_box(_bb, tile_src))
+        if _crop is None:
+            return None
+        return loc_image((_sx * 256, _sy * 256), _crop)
 
     def c_col(self, d, merge):
         return int((d // merge) * merge)

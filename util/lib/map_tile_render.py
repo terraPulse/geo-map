@@ -13,22 +13,9 @@ def _mask_grid(bnd, f, fzip):
     
     _pol = [_p for _p, _a in gb.load_shp(file_mag.get(f).get(), ext=bnd.extent().to_polygon())]
     _msk = rb.to_mask(bnd, _pol)
-    _shp = bnd.data.shape
-    
-    if len(_shp) == 2:
-        if bnd.nodata is None:
-            raise Exception('nodata needs to be set for the input raster')
-        bnd.data[_msk.data != 1] = bnd.nodata
-        return
-    
-    if len(_shp) == 3:
-        if _shp[0] != 4:
-            raise Exception('no transparency band provided')
-            
-        bnd.data[3, :, :][_msk.data != 1] = 0
-        return
-    
-    raise Exception('failed to recognize the image type')
+
+    from .tile_runtime import apply_region_mask
+    apply_region_mask(bnd.data, _msk.data, bnd.nodata)
 
 def make_tile(f, tile, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
     import os
@@ -43,10 +30,10 @@ def make_tile(f, tile, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, o
     from gio import file_unzip
     with file_unzip.file_unzip() as _zip:
         from gio import config
-        _cache = config.get('conf', 'cache', None)
-        if not _cache:
-            _tmp = _zip.generate_file()
-            config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+        from .tile_runtime import ensure_process_cache_dir
+        ensure_process_cache_dir(
+            lambda: config.get('conf', 'cache', None),
+            lambda path: config.set('conf', 'cache', path))
 
         _d_tmp = _zip.generate_file()
         os.makedirs(_d_tmp)
