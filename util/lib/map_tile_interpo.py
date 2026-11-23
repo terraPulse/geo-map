@@ -27,14 +27,33 @@ class interpo:
 
     def config(self):
         from gio import config
-        _repo = config.get('general', 'map_path')
-
-        _m = self.map
-        _f = f'{_repo}/{_m}/setting.ini'
-        
         from gio import file_mag
         import json
-        return json.loads(file_mag.get(_f).read())
+        import os
+        from .tile_runtime import get_cache
+
+        _repo = config.get('general', 'map_path')
+        _f = os.path.join(_repo, self.map, 'setting.ini')
+        _key = 'setting:' + _f
+        _cache = get_cache()
+
+        def _load():
+            _mag = file_mag.get(_f)
+            _cache.note_stat()
+            if not _mag.exists():
+                return None
+            _raw = _mag.read()
+            if not _raw:
+                return None
+            if isinstance(_raw, str):
+                _raw = _raw.encode('utf-8')
+            _cache.note_get(len(_raw))
+            return _raw
+
+        _raw = _cache.get_or_load_bytes(_key, _load)
+        if not _raw:
+            raise Exception('failed to load layer setting %s' % _f)
+        return json.loads(_raw)
 
     def read_file(self):
         from PIL import Image
@@ -53,15 +72,15 @@ class interpo:
     #     return _m.crop(box).resize((256, 256), resample=Image.NEAREST)
 
     def _image(self, level):
+        if level is None:
+            return None
+
         if level == self.tile.z:
             return self.read_file()
-        
-        if not level:
-            return None
-        
+
         if level < self.tile.z:
             return self.zoomin(level)
-        
+
         return self.zoomout(level)
 
     def image(self, level):
@@ -74,35 +93,27 @@ class interpo:
         return Image.new('RGBA', (256, 256), (0,0,0,0))
 
     def zoomin(self, level):
-        _ti = self.tile
-        
-        _ld = _ti.z - level
-        if _ld <= 0:
+        from .tile_runtime import child_sample_window, get_cache
+        import time
+
+        _spec = child_sample_window(
+            self.tile.x, self.tile.y, self.tile.z, level, self.tile.merge)
+        if _spec is None:
             return None
-        
-        _d = 2 ** _ld
-        _z = max(1, _ti.merge / _d)
-        
-        _tx = int(_ti.x / _d)
-        _ty = int(_ti.y / _d)
-        
-        _dx = _ti.x % _d
-        _dy = _ti.y % _d
 
         from . import map_tile
-        _to = map_tile.zxy(level, _tx, _ty, _z)
+        _to = map_tile.zxy(level, _spec['parent_x'], _spec['parent_y'], _spec['parent_merge'])
         _t = interpo(self.map, _to)
-        
+
         _m = _t.read_file()
         if not _m:
             return None
 
-        _ww = _z * 256
-        _ss = int(max(1, _ww / _d))
-        _bb = (_dx * _ss, _dy * _ss, (_dx + 1) * _ss, (_dy + 1) * _ss)
-        
         from PIL import Image
-        return _m.crop(_bb).resize((_ti.merge * 256, _ti.merge * 256), resample=Image.NEAREST)
+        _t0 = time.perf_counter()
+        _out = _m.crop(_spec['box']).resize(_spec['size'], resample=Image.NEAREST)
+        get_cache().record_resample(time.perf_counter() - _t0)
+        return _out
 
     def zoomin_tiles(self, level):
         # deprecated
@@ -194,18 +205,8 @@ class interpo:
         return f'{self.map}/{_t.z}/{_t.x}/{_t.y}.png'
 
     def find_nearest_level(self, ls):
-        _ll = self.tile.z
-        # check for zoom in first
-        _ls = [(_l, _ll - _l) for _l in ls if _ll > _l]
-        if not len(_ls):
-            _ls = [(_l, abs(_l - _ll)) for _l in ls]
-
-        if len(_ls) > 1:
-            _ls.sort(key=lambda x: x[1])
-        else:
-            return ls[0]
-        
-        return _ls[0][0]
+        from .tile_runtime import nearest_stored_level
+        return nearest_stored_level(self.tile.z, ls)
             
     def interpo_tile(self, ls):
         _l = self.find_nearest_level(ls)

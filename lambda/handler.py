@@ -4,6 +4,44 @@ import logging
 _jobs = []
 _tods = []
 
+def _tile_runtime():
+    import importlib
+    import os
+    import sys
+    try:
+        return importlib.import_module('tile_runtime')
+    except ImportError:
+        _lib = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), '..', 'util', 'lib'))
+        if _lib not in sys.path:
+            sys.path.insert(0, _lib)
+        return importlib.import_module('tile_runtime')
+
+def prepare_request(event):
+    '''Validate an API Gateway proxy event before any tile I/O.'''
+    if not isinstance(event, dict) or not isinstance(event.get('path'), str):
+        return None, _json_response(400, 'missing path')
+    path = event['path']
+    if path.startswith('/'):
+        path = path[1:]
+    if not path:
+        return None, _json_response(400, 'missing tile path')
+    if map_tile._normalize_path(None, path) is None:
+        return None, _json_response(400, 'invalid tile path')
+    return path, None
+
+def _json_response(status, message):
+    import json
+    return {
+        'isBase64Encoded': False,
+        'statusCode': status,
+        'headers': {'content-type': 'application/json'},
+        'body': json.dumps({'status': 'error', 'error_message': message}),
+    }
+
+def failure_response():
+    return _json_response(500, 'failed to produce the tile')
+
 class tiles:
 
     def __init__(self):
@@ -55,22 +93,7 @@ def _mask_grid(bnd, f, fzip):
     
     _pol = [_p for _p, _a in gb.load_shp(file_mag.get(f).get(), ext=bnd.extent().to_polygon())]
     _msk = rb.to_mask(bnd, _pol)
-    _shp = bnd.data.shape
-    
-    if len(_shp) == 2:
-        if bnd.nodata is None:
-            raise Exception('nodata needs to be set for the input raster')
-        bnd.data[_msk.data != 1] = bnd.nodata
-        return
-    
-    if len(_shp) == 3:
-        if _shp[0] != 4:
-            raise Exception('no transparency band provided')
-            
-        bnd.data[3, :, :] = 0
-        return
-    
-    raise Exception('failed to recognize the image type')
+    _tile_runtime().apply_region_mask(bnd.data, _msk.data, bnd.nodata)
 
 def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, agg=None, opts={}):
     # from osgeo import gdal
@@ -93,10 +116,9 @@ def make_tile(f, lev, col, row, percent, vals, solid_bg, f_clr, f_msk, d_out, ag
     from gio import file_unzip
     with file_unzip.file_unzip() as _zip:
         from gio import config
-        _cache = config.get('conf', 'cache', None)
-        if not _cache:
-            _tmp = _zip.generate_file()
-            config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+        _tile_runtime().ensure_process_cache_dir(
+            lambda: config.get('conf', 'cache', None),
+            lambda path: config.set('conf', 'cache', path))
 
         _ext = tiles().extent(lev, col, row)
 
@@ -704,6 +726,10 @@ class map_tile:
         _col = _m.group(3)
         _row = _m.group(4)
 
+        _rt = _tile_runtime()
+        if (not _rt.is_safe_layer_tag(_tag)) or _lev < 0 or _lev > _rt.MAX_ZOOM:
+            return None
+
         _num = 2 ** _lev
 
         if _col[0] in ('_', '-'):
@@ -748,10 +774,9 @@ class map_tile:
         from gio import config
 
         with file_unzip.zip() as _zip:
-            _cache = config.get('conf', 'cache', None)
-            if not _cache:
-                _tmp = _zip.generate_file()
-                config.set('conf', 'cache', os.path.join(_tmp, 'cache'))
+            _tile_runtime().ensure_process_cache_dir(
+                lambda: config.get('conf', 'cache', None),
+                lambda path: config.set('conf', 'cache', path))
 
             if not file_mag.get(_out).exists():
             # if True:
@@ -835,46 +860,31 @@ def clean_dir(d):
         pass
 
 def lambda_handler(event, context):
+    _path, _err = prepare_request(event)
+    if _err is not None:
+        return _err
+    return _render_with_retries(_path)
+
+def _render_with_retries(path):
     _d_tmp = '/tmp/geomap'
     init_path(_d_tmp)
-    
-    # _ps = event['queryStringParameters']
-    _path = event['path']
-    if _path.startswith('/'):
-        _path = _path[1:]
-    
-    from gio import file_unzip
-    
-    for _t in range(3):
-        # _f = map_tile().get(_path)
-        # return _output_file(_f)    
 
+    from gio import file_unzip
+
+    for _t in range(3):
         with file_unzip.zip() as _zip:
             _d_inp = _zip.generate_file()
             init_env(_d_inp)
             try:
-                # from geo_map_util import map_tile_parse
-                # _f = map_tile_parse.map_tile().get(_path)
-                _f = map_tile().get(_path)
-                
-                # try:
-                #     import shutil
-                #     shutil.rmtree(_d_tmp)
-                # except:
-                #     pass
-            
-                # return {'f': _f}
-                return _output_file(_f)    
+                _f = map_tile().get(path)
+                return _output_file(_f)
             except Exception as _err:
-                # import traceback
-                # logging.error(traceback.format_exc())
                 logging.error(str(_err))
-            except:
-                logging.error('something is wrong')
             finally:
                 clean_dir(_d_inp)
-                
-        logging.error('failed at the try %s (%s)' % (_t, _path))
+
+        logging.error('failed at the try %s (%s)' % (_t, path))
         clean_dir(_d_tmp)
-        
-    logging.error('failed at the requrest (%s)' % (_path))
+
+    logging.error('failed at the requrest (%s)' % (path))
+    return failure_response()

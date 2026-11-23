@@ -20,13 +20,29 @@ class map_tile_util:
         from gio import obj
         from gio import config
         from gio import file_mag
-        from gio import obj
+        from .tile_runtime import get_cache, materialize_bytes
 
         _out = os.path.join(config.get('general', 'map_path'), tag)
+        _path = os.path.join(_out, 'setting.ini')
+        _key = 'setting:' + _path
+        _cache = get_cache()
 
-        _f_ini = file_mag.get(os.path.join(_out, 'setting.ini')).get()
-        if _f_ini:
-            _met = obj.load(_f_ini)
+        def _load():
+            _mag = file_mag.get(_path)
+            _cache.note_stat()
+            if not _mag.exists():
+                return None
+            _raw = _mag.read()
+            if not _raw:
+                return None
+            if isinstance(_raw, str):
+                _raw = _raw.encode('utf-8')
+            _cache.note_get(len(_raw))
+            return _raw
+
+        _raw = _cache.get_or_load_bytes(_key, _load)
+        if _raw:
+            _met = obj.load(materialize_bytes(_key, _raw, '.ini'))
         else:
             _met = obj.obj()
 
@@ -80,40 +96,12 @@ def _parse_url(f):
     return {'tag': _tag, 'lev': _lev, 'col': _col, 'row': _row}
     
 def _normalize_loc(v, lev, reverse=False):
-    _v = int(v.replace('_', '-'))
-    
-    if reverse:
-        _v = _v * -1
-        
-    if _v >= 0:
-        return _v
-    
-    return (2 ** lev) + _v - 1
+    from .tile_runtime import normalize_loc
+    return normalize_loc(v, lev, reverse)
 
 def _normalize_path(p, order):
-    import re
-    _m = re.search('^(.+)\/(\d+)\/([_\-]?\d+)\/([_\-]?\d+)(.png)$', p)
-    if not _m:
-        return None
-
-    _tag = _m.group(1)
-    
-    if order == 'zx_y':
-        _lev = int(_m.group(2))
-        _col = _normalize_loc(_m.group(3), _lev)
-        _row = _normalize_loc(_m.group(4), _lev)
-    elif order == 'zxy':
-        _lev = int(_m.group(2))
-        _col = _normalize_loc(_m.group(3), _lev)
-        _row = _normalize_loc(_m.group(4), _lev, reverse=True)
-    elif order == 'xyz':
-        _lev = int(_m.group(4))
-        _col = _normalize_loc(_m.group(2), _lev)
-        _row = _normalize_loc(_m.group(3), _lev, reverse=True)
-    else:
-        raise Exception('unsupported order request %' % order)
-
-    return '%s/%s/%s/%s%s' % (_tag, _lev, _col, _row, _m.group(5))
+    from .tile_runtime import normalize_service_path
+    return normalize_service_path(p, order)
 
 def nodata_image(size):
     import PIL.Image
@@ -127,22 +115,26 @@ def nodata_image(size):
     return _io.getvalue()
         
 def get(path, tile_order='zx_y', merge=1):
-    import os
-
     _path = path
     if not _path:
         _path = '/'
 
-    _path = _normalize_path(path, tile_order)
-    if not _path:
+    from .tile_runtime import safe_child_path
+
+    _norm = _normalize_path(path, tile_order)
+    if not _norm:
         from gio import config
         from gio import file_mag
 
-        _f = file_mag.get(os.path.join(config.get('general', 'map_path'), path))
+        _child = safe_child_path(config.get('general', 'map_path'), path)
+        if _child is None:
+            return None
+        _f = file_mag.get(_child)
         if _f.exists():
             with open(_f.get(), 'rb') as _fi:
                 return _fi.read()
         return None
+    _path = _norm
     
     _pss = _parse_url(_path)
     if _pss is None:

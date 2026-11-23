@@ -62,7 +62,7 @@ class web(serv_base.service_base):
         
         logging.info('map path: %s (%s)' % (_d_map, os.path.isdir(_d_map)))
         
-        _fs = self._add_maps_dirs(_d_map, _host, fzip) if os.path.isdir(_d_map) \
+        _fs = self._add_maps_dir(_d_map, _host, fzip) if os.path.isdir(_d_map) \
                 else self._add_maps_list(_d_map, _host, fzip)
 
         if len(_fs) == 0:
@@ -79,20 +79,20 @@ class web(serv_base.service_base):
 
     def _set_host(self, f, fzip):
         from gio import file_mag
+        from gio import config
 
         _host = config.get('general', 'map_host', '')
-        
+
         _f = fzip.generate_file('', '.js')
         _p = '{{host}}'
         with open(_f, 'w') as _fo:
             _t = file_mag.get(f).read()
             if not _t:
                 return None
-            _fo.write(_t.decode('utf-8').replace(_p, _sev))
+            _fo.write(_t.decode('utf-8').replace(_p, _host))
         return _f
     
     def task(self, path):
-        import os
         import re
         from gio import config
         from gio import file_unzip
@@ -102,21 +102,25 @@ class web(serv_base.service_base):
         if _path == '' or _path == '/':
             _path  = 'index.html'
 
+        from geo_map_util.tile_runtime import safe_child_path
         _d_web = config.get_at('general', 'web_path')
-        _f_res = os.path.join(_d_web, _path)
+        _f_res = safe_child_path(_d_web, _path)
+        if _f_res is None:
+            logging.error('rejected web path %s' % _path)
+            return
 
         if not file_mag.get(_f_res).exists():
             logging.error('no file found %s' % _f_res)
             return
 
         logging.debug('loading web path: ' + path)
-        if re.search('js/map.*\.js', _f_res):
-            with file_unzip.file_unzip() as _zip:
-                return self.output_file(self._add_maps(_f_res, _zip))
-                
-        if re.search('js/map_controls\.js', _f_res):
+        if re.search(r'js/map_controls\.js', _f_res):
             with file_unzip.file_unzip() as _zip:
                 return self.output_file(self._set_host(_f_res, _zip))
+
+        if re.search(r'js/map.*\.js', _f_res):
+            with file_unzip.file_unzip() as _zip:
+                return self.output_file(self._add_maps(_f_res, _zip))
 
         return self.output_file(_f_res)
 

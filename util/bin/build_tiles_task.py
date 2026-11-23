@@ -155,7 +155,8 @@ def make_tile(lev, num, col, row, met, opts, inp):
     _tile = map_tile.tile(lev, col, row, _met.get('tile_merge', 1))
     _d_web = config.get('general', 'map_path')
 
-    return map_tile_task.map_tile_task().read(_met, _d_web, _tag, _tile)
+    return map_tile_task.map_tile_task().read(
+        _met, _d_web, _tag, _tile, building_tiles=True)
     
 def parse_levels(lvls):
     import re

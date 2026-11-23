@@ -62,17 +62,18 @@ class tile:
     def row(self):
         return self.y
 
-    def file(self, d_out, version=2.0):
+    def png_path(self, d_out, version=2.0):
         import os
-        from gio import file_mag
-        
+
         if version < 2.0:
             _d = os.path.join(d_out, str(self.level), str(self.col))
         else:
             _d = os.path.join(d_out, 'tiles', str(self.level), str(self.col))
-            
-        _f = os.path.join(_d, '%s.png' % self.row)
-        return file_mag.get(_f)
+        return os.path.join(_d, '%s.png' % self.row)
+
+    def file(self, d_out, version=2.0):
+        from gio import file_mag
+        return file_mag.get(self.png_path(d_out, version))
 
     def __repr__(self):
         return (lambda x: f'{x.z}/{x.x}/{x.y}@{x.merge}')(self)

@@ -208,19 +208,45 @@ class map_tile_task:
         return _io.getvalue()
 
     def read(self, met, d_web, tag, tile, building_tiles=False):
-        _out_file = tile.file(os.path.join(d_web, tag), met.get('version', 1.0))
+        from .tile_runtime import get_cache, source_render_forced, view_miss_action
 
-        if _out_file.exists():
-            return _out_file.read()
+        _version = met.get('version', 1.0)
+        _root = os.path.join(d_web, tag)
+        _out_file = tile.file(_root, _version)
+        _key = tile.png_path(_root, _version)
+        _cache = get_cache()
 
-        if not building_tiles:
-            _min_level = met.get('min_dynamic_level', self.min_level)
-            
-            if config.getboolean('conf', 'skip_low_levels', True) and tile.z < _min_level:
-                return self._nodata_image(tile.merge * 256)
-        
+        def _load():
+            _cache.note_stat()
+            if not _out_file.exists():
+                return None
+            _data = _out_file.read()
+            if not _data:
+                return None
+            if isinstance(_data, str):
+                _data = _data.encode('utf-8')
+            _cache.note_get(len(_data))
+            return _data
+
+        _hit = _cache.get_or_load_bytes(_key, _load)
+        if _hit is not None:
+            return _hit
+
+        _min_level = met.get('min_dynamic_level', self.min_level)
+        _below = config.getboolean('conf', 'skip_low_levels', True) and tile.z < _min_level
+        _action = view_miss_action(
+            building_tiles,
+            met.get('processed_levels', None) is not None,
+            _below,
+            force_source_render=source_render_forced(),
+        )
+        if _action == 'nodata':
+            # Block layers resample stored PNGs. A missing block is empty,
+            # not a source-raster render, unless pregeneration asked for one.
+            return self._nodata_image(tile.merge * 256)
+
         self._dmap_mag_single(met, tile)
-        
+
         if not _out_file.exists():
             _ooo = self._nodata_image(tile.merge * 256)
             if config.getboolean('conf', 'keep_nodata_tiles', False):
@@ -228,4 +254,8 @@ class map_tile_task:
             return _ooo
 
         self._post_proc(_out_file, met, tile.merge)
-        return _out_file.read()
+        _cache.invalidate(_key)
+        _final = _cache.get_or_load_bytes(_key, _load)
+        if _final is not None:
+            return _final
+        return self._nodata_image(tile.merge * 256)

@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Isolated TEST function geomap-tile-pyramid-test. Serves allowlisted PNG
+  pyramid layers by cropping and resampling stored PNGs. Does not read source
+  rasters. Not the production /maptiles front.
+
+Rules:
+  TerraPulseAccount:
+    Assertions:
+      - Assert: !Equals [!Ref 'AWS::AccountId', '544020760996']
+        AssertDescription: Deploy only in terraPulse account 544020760996.
+      - Assert: !Equals [!Ref 'AWS::Region', 'us-west-2']
+        AssertDescription: Deploy only in us-west-2.
+  HeaderAuthNeedsToken:
+    Assertions:
+      - Assert: !Or
+          - !Not [!Equals [!Ref AuthMode, header]]
+          - !Not [!Equals [!Ref TileAuthToken, '']]
+        AssertDescription: AuthMode header requires TileAuthToken. Do not commit the token.
+
+Parameters:
+  ArtifactBucket:
+    Type: String
+    Description: Bucket the parent uploaded the test zip into. Not a tile-data bucket.
+    AllowedPattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+  ArtifactKey:
+    Type: String
+    Default: geomap-tile-pyramid-test/geomap-tile-pyramid-test-py312-x86_64.zip
+    AllowedPattern: '^[a-zA-Z0-9][a-zA-Z0-9!_.*()/-]{0,200}$'
+  TileBucket:
+    Type: String
+    Default: ''
+    Description: Optional staging bucket. Empty keeps the function on the packaged fixture only.
+    AllowedPattern: '^$|^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+  TileKeyPrefix:
+    Type: String
+    Default: tile-pyramid-test/
+    Description: Read-only key prefix. IAM allows s3:GetObject only under this prefix.
+    AllowedPattern: '^[a-zA-Z0-9][a-zA-Z0-9_./-]{0,120}$'
+  AuthMode:
+    Type: String
+    Default: iam
+    AllowedValues:
+      - iam
+      - header
+  TileAuthToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Required only for AuthMode header. Supply at deploy time. Not a repository secret.
+    MaxLength: 200
+  CorsOrigin:
+    Type: String
+    Default: ''
+    Description: Exact browser Origin for the management preview, or empty to send no CORS header.
+    MaxLength: 200
+
+Conditions:
+  HasTileBucket: !Not [!Equals [!Ref TileBucket, '']]
+  HeaderAuth: !Equals [!Ref AuthMode, header]
+  HasCors: !Not [!Equals [!Ref CorsOrigin, '']]
+
+Resources:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/geomap-tile-pyramid-test
+      RetentionInDays: 7
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: geomap-tile-pyramid-test
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies: !If
+        - HasTileBucket
+        - - PolicyName: read-tile-prefix
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource: !Sub 'arn:aws:s3:::${TileBucket}/${TileKeyPrefix}*'
+        - !Ref AWS::NoValue
+
+  Function:
+    Type: AWS::Lambda::Function
+    DependsOn: LogGroup
+    Properties:
+      FunctionName: geomap-tile-pyramid-test
+      Description: TEST ONLY. PNG pyramid crop/resample. No source-raster reads.
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Handler: handler.lambda_handler
+      Role: !GetAtt Role.Arn
+      Timeout: 10
+      MemorySize: 512
+      ReservedConcurrentExecutions: 2
+      Code:
+        S3Bucket: !Ref ArtifactBucket
+        S3Key: !Ref ArtifactKey
+      Environment:
+        Variables:
+          TILE_AUTH_MODE: !Ref AuthMode
+          TILE_AUTH_TOKEN: !If [HeaderAuth, !Ref TileAuthToken, '']
+          TILE_CORS_ORIGIN: !Ref CorsOrigin
+          TILE_BUCKET: !Ref TileBucket
+          TILE_KEY_ROOT: !Ref TileKeyPrefix
+
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref Function
+      AuthType: !If [HeaderAuth, NONE, AWS_IAM]
+      InvokeMode: BUFFERED
+      Cors: !If
+        - HasCors
+        - AllowCredentials: false
+          AllowHeaders:
+            - content-type
+            - x-tile-test-token
+            - authorization
+          AllowMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          AllowOrigins:
+            - !Ref CorsOrigin
+          MaxAge: 600
+        - !Ref AWS::NoValue
+
+  UrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: HeaderAuth
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  PublicInvokePermission:
+    Type: AWS::Lambda::Permission
+    Condition: HeaderAuth
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunction
+      Principal: '*'
+      InvokedViaFunctionUrl: true
+
+Outputs:
+  FunctionName:
+    Value: !Ref Function
+  FunctionArn:
+    Value: !GetAtt Function.Arn
+  FunctionUrl:
+    Value: !GetAtt FunctionUrl.FunctionUrl
+  Adapter:
+    Value: geomap.png_pyramid
+  AdapterVersion:
+    Value: '1.0.0'
+  TilePath:
+    Value: /tiletest/v1/{order}/{layer_id}/{z}/{x}/{y}.png
+  LayersPath:
+    Value: /tiletest/v1/layers
