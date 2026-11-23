@@ -15,12 +15,14 @@ CONFIRM_CREATE_DRAFT = "create-draft"
 CONFIRM_PUBLISH = "publish-registry-only"
 CONFIRM_IMPORT = "import-legacy-draft"
 CONFIRM_RESTORE = "restore-registry-only"
+CONFIRM_QUEUE_BUILD = "queue-build"
 
 CONFIRMATIONS = (
     CONFIRM_CREATE_DRAFT,
     CONFIRM_PUBLISH,
     CONFIRM_IMPORT,
     CONFIRM_RESTORE,
+    CONFIRM_QUEUE_BUILD,
 )
 
 INVENTORY_REGISTRY = "registry"

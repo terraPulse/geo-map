@@ -76,9 +76,36 @@ Parameters:
     Default: map
     AllowedValues: [map, zx_y, zxy, xyz]
     Description: Historical tile path used only to compose a preview address.
+  RendererInvokeEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      When true, the admin Lambda may invoke only
+      arn:aws:lambda:us-west-2:544020760996:function:geomap-tile-pyramid-test.
+      The function URL is not used and the admin token is not forwarded.
+  EnableBuilds:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Intent to allow real builds. Stays off unless SourceBucketName is also set. gio/GDAL is not in this Lambda.
+  SourceBucketName:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    Description: Optional read-only dataset bucket. Empty disables real builds. Do not use a tile bucket.
+  SourceKeyPrefix:
+    Type: String
+    Default: "datasets/"
+    AllowedPattern: "^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$"
+    Description: Prefix inside SourceBucketName. The job role, when added later, may only read this prefix.
 
 Conditions:
   UsePitr: !Equals [!Ref EnablePitr, "true"]
+  InvokeRenderer: !Equals [!Ref RendererInvokeEnabled, "true"]
+  RealBuilds: !And
+    - !Equals [!Ref EnableBuilds, "true"]
+    - !Not [!Equals [!Ref SourceBucketName, ""]]
 
 Resources:
   FrontendBucket:
@@ -442,6 +469,34 @@ Resources:
           LAYER_MANAGER_CORS_ORIGINS: !Sub "https://${Distribution.DomainName}"
           LAYER_MANAGER_TILE_BACKEND_BASE_URL: !Ref TileBackendBaseUrl
           LAYER_MANAGER_TILE_PATH_ORDER: !Ref TilePathOrder
+          LAYER_MANAGER_RENDERER_MODE: !If [InvokeRenderer, "lambda", "disabled"]
+          LAYER_MANAGER_RENDERER_FUNCTION_ARN: !If
+            - InvokeRenderer
+            - "arn:aws:lambda:us-west-2:544020760996:function:geomap-tile-pyramid-test"
+            - ""
+          LAYER_MANAGER_BUILDS_ENABLED: !If [RealBuilds, "true", "false"]
+          LAYER_MANAGER_BUILD_EXECUTOR: disabled
+          LAYER_MANAGER_SOURCE_ALLOWLIST: !If
+            - RealBuilds
+            - !Sub "datasets=s3://${SourceBucketName}/${SourceKeyPrefix}"
+            - ""
+          LAYER_MANAGER_OUTPUT_PREFIX: builds
+          LAYER_MANAGER_MAX_BUILD_TILES: "32"
+
+  RendererInvokePolicy:
+    Type: AWS::IAM::Policy
+    Condition: InvokeRenderer
+    Properties:
+      PolicyName: invoke-geomap-tile-pyramid-test
+      Roles:
+        - !Ref ApiRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: InvokeTileTestOnly
+            Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: arn:aws:lambda:us-west-2:544020760996:function:geomap-tile-pyramid-test
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api

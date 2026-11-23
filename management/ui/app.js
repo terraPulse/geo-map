@@ -168,6 +168,7 @@
   function route() {
     const hash = location.hash || "#/layers";
     const parts = hash.replace(/^#\//, "").split("/");
+    if (parts[0] === "build") return { name: "build" };
     if (parts[0] === "register") return { name: "register" };
     if (parts[0] === "import") return { name: "import" };
     if (parts[0] === "layers" && parts.length > 1) {
@@ -183,6 +184,7 @@
       return;
     }
     const current = route();
+    if (current.name === "build" && window.LayerManagerBuild) return window.LayerManagerBuild.render({ main: main, api: api, el: el, say: say, actor: actor });
     if (current.name === "register") return renderRegister();
     if (current.name === "import") return renderImport();
     if (current.name === "detail") return renderDetail(current.tag);
@@ -206,6 +208,7 @@
     );
     const actions = el("div", { className: "actions" });
     if (!actor || actor.role === "layer-admin") {
+      actions.appendChild(linkButton("Build from a dataset", "#/build"));
       actions.appendChild(linkButton("Register a layer", "#/register"));
       actions.appendChild(linkButton("Import legacy metadata", "#/import", true));
     }

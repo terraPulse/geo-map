@@ -9,7 +9,7 @@ from urllib.parse import parse_qs
 
 from .auth import authenticate, require_writer
 from .effects import effects
-from .errors import LayerManagerError, PayloadTooLarge, ValidationFailed
+from .errors import Forbidden, LayerManagerError, PayloadTooLarge, ValidationFailed
 from .preview_urls import tile_backend_status
 from .schema_contract import SCHEMA_ID
 from .service import LayerService
@@ -25,10 +25,20 @@ _WRITES = {
 }
 
 
+class BinaryResponse:
+    def __init__(self, status, content_type, body, extra=None):
+        self.status = status
+        self.content_type = content_type
+        self.body = body
+        self.extra = extra or {}
+
+
 class Api:
-    def __init__(self, service, settings):
+    def __init__(self, service, settings, builds=None, preview=None):
         self.service = service
         self.settings = settings
+        self.builds = builds
+        self.preview = preview
 
     def handle(self, method, path, query, headers, body, apigateway_event=None, now=None):
         method = method.upper()
@@ -43,7 +53,23 @@ class Api:
             if (method, path) in _WRITES:
                 require_writer(actor)
             payload = _json_body(body) if body else {}
-            status, result = self._dispatch(method, path, query, payload, actor)
+            dispatched = self._dispatch(method, path, query, payload, actor)
+            if isinstance(dispatched, BinaryResponse):
+                headers_out = {
+                    "content-type": dispatched.content_type,
+                    "cache-control": "no-store",
+                    "x-content-type-options": "nosniff",
+                    "referrer-policy": "no-referrer",
+                    "x-layer-manager-writes": "none",
+                }
+                headers_out.update(dispatched.extra)
+                if self.settings.emit_cors:
+                    origin = _origin(headers)
+                    if origin and origin in self.settings.cors_origins:
+                        headers_out["access-control-allow-origin"] = origin
+                        headers_out["vary"] = "Origin"
+                return dispatched.status, headers_out, dispatched.body
+            status, result = dispatched
             return self._respond(status, {"ok": True, "result": result}, headers)
         except LayerManagerError as exc:
             return self._respond(exc.status, exc.to_body(), headers)
@@ -120,6 +146,10 @@ class Api:
             return 200, self.service.export_legacy(_tag(query, payload))
         if method == "GET" and path == "/v1/layers/audit":
             return 200, self.service.list_audit(_tag(query, payload))
+        if self.builds is not None and path.startswith("/v1/builds"):
+            return self._builds(method, path, query, payload, actor)
+        if self.preview is not None and path.startswith("/v1/preview"):
+            return self._preview(method, path, query, payload, actor)
         if method == "POST" and path == "/v1/layers/item/restore":
             return 200, self.service.restore(
                 _tag(query, payload),
@@ -128,6 +158,58 @@ class Api:
                 payload.get("confirmation"),
                 actor.sub,
                 actor.role,
+            )
+        return 404, None
+
+    def _builds(self, method, path, query, payload, actor):
+        if method != "GET":
+            require_writer(actor)
+        if method == "GET" and path == "/v1/builds/config":
+            return 200, self.builds.config()
+        if method == "GET" and path == "/v1/builds/sources":
+            return 200, self.builds.list_sources()
+        if method == "POST" and path == "/v1/builds/inspect":
+            return 200, self.builds.inspect(payload.get("source_id"), payload.get("key"))
+        if method == "POST" and path == "/v1/builds/plan":
+            return 200, self.builds.plan(payload)
+        if method == "POST" and path == "/v1/builds":
+            return 202, self.builds.submit(payload, actor.sub, actor.role)
+        if method == "GET" and path == "/v1/builds/item":
+            return 200, self.builds.get(payload.get("job_id") or _one(query, "job_id"))
+        if method == "POST" and path == "/v1/builds/item/cancel":
+            return 200, self.builds.cancel(payload.get("job_id"), actor.sub)
+        if method == "POST" and path == "/v1/builds/item/retry":
+            return 200, self.builds.retry(payload.get("job_id"), actor.sub)
+        if method == "POST" and path == "/v1/builds/item/publish":
+            return 200, self.builds.publish(payload.get("job_id"), actor.sub, actor.role, payload.get("confirmation"))
+        if method == "POST" and path == "/v1/builds/worker/run":
+            if self.settings.env == "staging":
+                raise Forbidden("The staging API does not run builds inside the request.")
+            return 200, {"job": self.builds.run_once()}
+        return 404, None
+
+    def _preview(self, method, path, query, payload, actor):
+        if method == "GET" and path == "/v1/preview/status":
+            return 200, self.preview.status()
+        if method == "GET" and path == "/v1/preview/layers":
+            return 200, self.preview.list_layers()
+        if method == "GET" and path == "/v1/preview/tile":
+            try:
+                z = int(_one(query, "z"))
+                x = int(_one(query, "x"))
+                y = int(_one(query, "y"))
+            except (TypeError, ValueError) as exc:
+                raise ValidationFailed("z, x, and y must be integers.", []) from exc
+            blob, meta = self.preview.tile(_one(query, "layer_id"), z, x, y, _one(query, "order") or "map")
+            return BinaryResponse(
+                200,
+                "image/png",
+                blob,
+                {
+                    "x-geomap-preview-source": meta["source"],
+                    "x-geomap-fixture": "true" if meta["fixture"] else "false",
+                    "x-geomap-real-s3-build": "false",
+                },
             )
         return 404, None
 

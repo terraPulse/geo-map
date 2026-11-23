@@ -2,6 +2,7 @@
 
 from urllib.parse import urlparse
 
+from .build_allow import parse_allowlist
 from .errors import ConfigurationError
 from .preview_urls import PATH_ORDERS
 from .schema_contract import AUTHORIZED_ACCOUNT, AUTHORIZED_REGION
@@ -38,6 +39,13 @@ class Settings:
         preview_hosts,
         tile_backend_base_url="",
         tile_path_order="map",
+        builds_enabled=False,
+        build_executor="disabled",
+        source_allowlist="",
+        output_prefix="builds",
+        max_build_tiles=32,
+        renderer_mode="disabled",
+        renderer_function_arn="",
         seed_fixtures,
         allow_fixture_auth,
         cors_origins,
@@ -57,6 +65,13 @@ class Settings:
         self.preview_hosts = tuple(preview_hosts)
         self.tile_backend_base_url = (tile_backend_base_url or "").rstrip("/")
         self.tile_path_order = tile_path_order or "map"
+        self.builds_enabled = bool(builds_enabled)
+        self.build_executor = build_executor or "disabled"
+        self.source_allowlist = parse_source_allowlist(source_allowlist)
+        self.output_prefix = output_prefix or "builds"
+        self.max_build_tiles = int(max_build_tiles)
+        self.renderer_mode = renderer_mode or "disabled"
+        self.renderer_function_arn = renderer_function_arn or ""
         self.seed_fixtures = seed_fixtures
         self.allow_fixture_auth = allow_fixture_auth
         self.cors_origins = tuple(cors_origins)
@@ -102,6 +117,22 @@ class Settings:
             raise ConfigurationError("Tile path order must be map, zx_y, zxy, or xyz.")
         if self.tile_backend_base_url:
             validate_tile_backend_base(self.tile_backend_base_url)
+        if self.build_executor not in {"disabled", "fixture-offline", "gio"}:
+            raise ConfigurationError("Build executor is not recognized.")
+        if self.renderer_mode not in {"disabled", "fixture-offline", "lambda"}:
+            raise ConfigurationError("Renderer mode is not recognized.")
+        if self.env == "staging" and self.build_executor == "fixture-offline":
+            raise ConfigurationError("Staging does not run fixture builds.")
+        if self.env == "staging" and self.renderer_mode == "fixture-offline":
+            raise ConfigurationError("Staging does not use the offline renderer fixture.")
+        if self.renderer_mode == "lambda":
+            from .renderer_preview import validate_function_arn
+
+            validate_function_arn(self.renderer_function_arn)
+        if self.builds_enabled and not self.source_allowlist:
+            raise ConfigurationError("Real builds require a source allowlist.")
+        if ".." in self.output_prefix or self.output_prefix.startswith("/"):
+            raise ConfigurationError("Output prefix is not allowed.")
 
     def effective_preview_hosts(self):
         hosts = list(self.preview_hosts)
@@ -143,11 +174,24 @@ class Settings:
             preview_hosts=_csv(env, "LAYER_MANAGER_PREVIEW_HOSTS"),
             tile_backend_base_url=env.get("LAYER_MANAGER_TILE_BACKEND_BASE_URL", ""),
             tile_path_order=env.get("LAYER_MANAGER_TILE_PATH_ORDER", "map") or "map",
+            builds_enabled=_flag(env, "LAYER_MANAGER_BUILDS_ENABLED", "0"),
+            build_executor=env.get("LAYER_MANAGER_BUILD_EXECUTOR", "disabled") or "disabled",
+            source_allowlist=env.get("LAYER_MANAGER_SOURCE_ALLOWLIST", ""),
+            output_prefix=env.get("LAYER_MANAGER_OUTPUT_PREFIX", "builds") or "builds",
+            max_build_tiles=int(env.get("LAYER_MANAGER_MAX_BUILD_TILES", "32") or "32"),
+            renderer_mode=env.get("LAYER_MANAGER_RENDERER_MODE", "disabled") or "disabled",
+            renderer_function_arn=env.get("LAYER_MANAGER_RENDERER_FUNCTION_ARN", ""),
             seed_fixtures=_flag(env, "LAYER_MANAGER_SEED_FIXTURES", seed_default),
             allow_fixture_auth=_flag(env, "LAYER_MANAGER_ALLOW_FIXTURE_AUTH", "1" if name in {"local", "test"} else "0"),
             cors_origins=_csv(env, "LAYER_MANAGER_CORS_ORIGINS"),
             emit_cors=_flag(env, "LAYER_MANAGER_EMIT_CORS", "1" if name == "local" else "0"),
         )
+
+
+def parse_source_allowlist(value):
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    return parse_allowlist(value)
 
 
 def _denied_backend(value):

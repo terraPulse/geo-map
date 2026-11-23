@@ -128,4 +128,17 @@ def make_server(settings, api, port=8765):
 def prepare_local(settings, api):
     if settings.env == "local" and settings.seed_fixtures:
         seed_missing(api.service, actor="fixture-seed", role="layer-admin")
+    if settings.env == "local" and settings.build_executor == "fixture-offline" and api.builds is not None:
+        import threading
+        import time
+
+        def _pump():
+            while True:
+                try:
+                    api.builds.run_once()
+                except Exception:
+                    pass
+                time.sleep(0.2)
+
+        threading.Thread(target=_pump, name="fixture-build-worker", daemon=True).start()
     return api

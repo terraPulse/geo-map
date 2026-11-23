@@ -26,6 +26,9 @@ def main(argv=None):
     os.environ.setdefault("LAYER_MANAGER_FILE_ROOT", root)
     os.environ.setdefault("LAYER_MANAGER_CORS_ORIGINS", f"http://127.0.0.1:{args.port}")
     os.environ.setdefault("LAYER_MANAGER_EMIT_CORS", "1")
+    os.environ.setdefault("LAYER_MANAGER_BUILDS_ENABLED", "0")
+    os.environ.setdefault("LAYER_MANAGER_BUILD_EXECUTOR", "fixture-offline")
+    os.environ.setdefault("LAYER_MANAGER_RENDERER_MODE", "fixture-offline")
     settings = Settings.from_env()
     if settings.env != "local":
         print("Refusing to start. The local server only runs when LAYER_MANAGER_ENV=local.", file=sys.stderr)
