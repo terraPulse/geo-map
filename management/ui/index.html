@@ -3,28 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>geo-map layer registry</title>
+  <title>geo-map layer manager</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <header class="mast">
-    <div class="mast-id">
-      <p class="eyebrow">geo-map staging</p>
-      <h1>Layer registry</h1>
+  <div class="app">
+    <aside class="sidenav">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <p class="brand-kicker">geo-map</p>
+          <p class="brand-title">Layer manager</p>
+        </div>
+      </div>
+      <nav aria-label="Sections">
+        <a id="nav-layers" href="#/layers">Layers</a>
+        <a id="nav-build" href="#/build">Datasets</a>
+        <a id="nav-preview" href="#/preview">Preview</a>
+      </nav>
+      <p class="sidenav-foot">Registry edits do not regenerate PNG pyramids.</p>
+    </aside>
+    <div class="maincol">
+      <header class="topbar">
+        <div>
+          <p id="crumb" class="crumb">Layers</p>
+          <p id="crumb-sub" class="crumb-sub">Staging registry</p>
+        </div>
+        <div id="auth-slot" class="auth-slot"></div>
+      </header>
+      <p id="notice" class="notice" role="status" hidden></p>
+      <main id="main" tabindex="-1">
+        <p id="boot" class="loading">Loading the console.</p>
+      </main>
     </div>
-    <p id="auth-slot" class="auth-slot"></p>
-  </header>
-  <div class="banner" role="note">
-    <strong>Registry edits do not regenerate PNG pyramids.</strong>
-    <span>Publishing changes this registry only. The legacy tile server keeps its setting.ini files and existing PNGs until a separate tile job is run by hand.</span>
   </div>
-  <div id="fixture-banner" class="banner banner-fixture" role="status">
-    This page does not embed live inventory. Layer rows appear only after an authenticated registry response, and synthetic fixtures are badged.
-  </div>
-  <main id="main" tabindex="-1">
-    <p id="boot">Loading the console. If this stays here, config.js is missing and no layer data is available.</p>
-  </main>
   <div id="live" class="live" aria-live="polite"></div>
   <script src="./config.js"></script>
   <script src="./auth.js"></script>

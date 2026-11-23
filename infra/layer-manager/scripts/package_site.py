@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 UI = ROOT / "management" / "ui"
-INCLUDE = ("index.html", "styles.css", "app.js", "auth.js", "build.js")
+INCLUDE = ("index.html", "styles.css", "app.js", "auth.js", "build.js", "favicon.svg")
 
 
 def build(destination: Path) -> Path:

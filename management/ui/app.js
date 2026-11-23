@@ -77,20 +77,39 @@
     return Boolean(sessionStorage.getItem(tokenKey));
   }
 
+  function setNotice(text) {
+    const node = document.getElementById("notice");
+    if (!node) return;
+    node.textContent = text || "";
+    node.hidden = !text;
+  }
+
+  function setChrome(title, subtitle, nav) {
+    document.getElementById("crumb").textContent = title;
+    document.getElementById("crumb-sub").textContent = subtitle;
+    ["layers", "build", "preview"].forEach(function (name) {
+      const link = document.getElementById("nav-" + name);
+      if (!link) return;
+      if (name === nav) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+  }
+
   function renderAuth() {
     authSlot.textContent = "";
     if (!signedIn()) {
-      authSlot.appendChild(el("span", { className: "note", text: "Not signed in" }));
+      authSlot.appendChild(el("span", { className: "note", text: "Sign-in required" }));
       return;
     }
-    const label = actor ? actor.role + (actor.synthetic_identity ? " · fixture" : "") : "signed in";
-    authSlot.appendChild(el("span", { className: "note", text: label }));
+    const roleName = !actor ? "Signed in" : actor.role === "layer-admin" ? "Admin" : actor.role === "layer-reader" ? "Reader" : actor.role;
+    const label = roleName + (actor && actor.synthetic_identity ? " · fixture" : "");
+    authSlot.appendChild(el("span", { className: "chip", text: label }));
     const button = el("button", { className: "secondary", type: "button", text: "Sign out" });
-    button.style.marginLeft = "0.5rem";
     button.addEventListener("click", function () {
       sessionStorage.removeItem(storageKey);
       sessionStorage.removeItem(tokenKey);
       actor = null;
+      setNotice("");
       location.hash = "#/layers";
       render();
     });
@@ -99,9 +118,10 @@
 
   function renderGate() {
     main.textContent = "";
+    setChrome("Sign in", "Access is required before any registry data is requested", "layers");
     const section = el("section", { className: "panel gate" },
-      el("h2", { text: "Admin sign-in" }),
-      el("p", { text: "There is no open signup. The staging pool starts empty and creates users only when an administrator enrolls a confirmed identity." })
+      el("h2", { text: "Sign in" }),
+      el("p", { className: "lede", text: "This console shows layer metadata only after sign-in. There is no open signup on this page, and password recovery is not handled here." })
     );
     if (config.authMode === "local-fixture") {
       section.appendChild(el("p", { text: "This local process accepts two labeled fixture identities. They are not staging credentials." }));
@@ -117,8 +137,9 @@
       });
       section.appendChild(actions);
     } else if (config.cognito && config.cognito.clientId) {
-      const button = el("button", { type: "button", text: "Continue with Cognito" });
+      const button = el("button", { type: "button", text: "Sign in" });
       button.addEventListener("click", startHostedUi);
+      section.appendChild(el("p", { className: "note", text: "Sign-in opens the existing hosted page, including its current MFA step." }));
       section.appendChild(el("div", { className: "actions" }, button));
     } else {
       section.appendChild(el("p", { text: "Cognito is not configured in config.js. The console will not invent an identity." }));
@@ -168,6 +189,7 @@
   function route() {
     const hash = location.hash || "#/layers";
     const parts = hash.replace(/^#\//, "").split("/");
+    if (parts[0] === "preview") return { name: "preview" };
     if (parts[0] === "build") return { name: "build" };
     if (parts[0] === "register") return { name: "register" };
     if (parts[0] === "import") return { name: "import" };
@@ -184,7 +206,14 @@
       return;
     }
     const current = route();
-    if (current.name === "build" && window.LayerManagerBuild) return window.LayerManagerBuild.render({ main: main, api: api, el: el, say: say, actor: actor });
+    if ((current.name === "build" || current.name === "preview") && window.LayerManagerBuild) {
+      setChrome(
+        current.name === "preview" ? "Preview" : "Datasets",
+        current.name === "preview" ? "One allowlisted renderer image" : "Builds stay off until a source is allowed",
+        current.name
+      );
+      return window.LayerManagerBuild.render({ main: main, api: api, el: el, say: say, actor: actor, view: current.name });
+    }
     if (current.name === "register") return renderRegister();
     if (current.name === "import") return renderImport();
     if (current.name === "detail") return renderDetail(current.tag);
@@ -193,27 +222,35 @@
 
   async function renderList() {
     main.textContent = "";
-    const search = el("input", { id: "layer-search", type: "search" });
+    setChrome("Layers", "Registered metadata. Synthetic rows are labeled.", "layers");
+    const search = el("input", { id: "layer-search", type: "search", placeholder: "Search by tag or title" });
     search.addEventListener("input", function () { loadList(search.value); });
-    const list = el("ul", { id: "layer-list", className: "layer-list" });
-    const side = el("section", { className: "panel", "aria-label": "Layer list" },
-      el("h2", { text: "Layers" }),
+    const body = el("tbody", { id: "layer-list" });
+    body.appendChild(el("tr", {}, el("td", { colspan: "3", className: "loading", text: "Loading layers." })));
+    const table = el("table", {},
+      el("thead", {}, el("tr", {},
+        el("th", { scope: "col", text: "Layer" }),
+        el("th", { scope: "col", text: "Backend" }),
+        el("th", { scope: "col", text: "Status" })
+      )),
+      body
+    );
+    const catalog = el("section", { className: "panel", "aria-label": "Layer catalog" },
       el("label", { for: "layer-search", text: "Search layers" }),
       search,
-      list
+      table
     );
-    const detail = el("section", { id: "detail", className: "panel detail" },
-      el("h2", { text: "Select a layer" }),
-      el("p", { className: "note", text: "Choose a row to inspect zooms, block size, bounds, style, nodata, sources, and validation." })
+    const aside = el("aside", { className: "panel" },
+      el("h2", { text: "Working with layers" }),
+      el("p", { className: "note", text: "Open a row for zooms, bounds, style, and validation. Saving a record does not regenerate PNG pyramids." })
     );
-    const actions = el("div", { className: "actions" });
     if (!actor || actor.role === "layer-admin") {
-      actions.appendChild(linkButton("Build from a dataset", "#/build"));
-      actions.appendChild(linkButton("Register a layer", "#/register"));
-      actions.appendChild(linkButton("Import legacy metadata", "#/import", true));
+      aside.appendChild(el("div", { className: "actions" },
+        linkButton("Register a layer", "#/register"),
+        linkButton("Import legacy metadata", "#/import", true)
+      ));
     }
-    side.appendChild(actions);
-    main.appendChild(el("div", { className: "layout" }, side, detail));
+    main.appendChild(el("div", { className: "layout" }, catalog, aside));
     await loadList("");
     search.focus();
   }
@@ -228,28 +265,31 @@
     if (!list) return;
     const result = await api("GET", "/v1/layers?q=" + encodeURIComponent(query || ""));
     layers = result.layers;
-    const fixture = document.getElementById("fixture-banner");
-    fixture.textContent = result.inventory_note + (statusNote ? " " + statusNote : "");
+    setNotice(result.inventory_note);
     list.textContent = "";
     if (!layers.length) {
-      list.appendChild(el("li", { text: "No layers match this registry query." }));
+      list.appendChild(el("tr", {}, el("td", { colspan: "3", text: "No layers match this search." })));
       return;
     }
     layers.forEach(function (layer) {
-      const button = el("button", { type: "button" });
-      button.appendChild(el("div", { className: "tag", text: layer.tag }));
-      button.appendChild(el("div", { text: layer.title }));
-      button.appendChild(chips(layer));
-      button.addEventListener("click", function () {
-        location.hash = "#/layers/" + encodeURIComponent(layer.tag);
+      const row = el("tr", { className: "clickable", tabindex: "0" });
+      row.appendChild(el("td", {}, el("div", { className: "tag", text: layer.tag }), el("div", { text: layer.title })));
+      row.appendChild(el("td", { text: layer.backend }));
+      const status = el("td", {});
+      status.appendChild(chips(layer, false));
+      row.appendChild(status);
+      function open() { location.hash = "#/layers/" + encodeURIComponent(layer.tag); }
+      row.addEventListener("click", open);
+      row.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
       });
-      list.appendChild(el("li", {}, button));
+      list.appendChild(row);
     });
   }
 
-  function chips(layer) {
+  function chips(layer, includeBackend) {
     const row = el("div", { className: "chips" });
-    row.appendChild(el("span", { className: "chip", text: layer.backend }));
+    if (includeBackend !== false) row.appendChild(el("span", { className: "chip", text: layer.backend }));
     row.appendChild(el("span", { className: "chip " + layer.status, text: layer.status }));
     if (layer.synthetic) row.appendChild(el("span", { className: "chip synthetic", text: "Synthetic fixture" }));
     return row;
@@ -265,28 +305,24 @@
       return;
     }
     selected = result.layer;
-    const back = el("p", {}, el("a", { href: "#/layers", text: "Back to layers" }));
+    setChrome(selected.title, selected.tag, "layers");
     const head = el("section", { className: "panel detail" },
-      back,
-      el("p", { className: "eyebrow", text: selected.synthetic ? "Synthetic fixture" : "Registry record" }),
+      el("p", {}, el("a", { href: "#/layers", text: "Back to layers" })),
       el("h2", { id: "layer-title", tabindex: "-1", text: selected.title }),
-      el("p", { className: "tag", text: selected.tag }),
       chips(selected),
-      el("p", { text: "Revision " + selected.revision + ". Updated " + selected.updated_at + " by " + selected.updated_by + "." })
+      el("p", { className: "note", text: "Revision " + selected.revision + ". Updated " + selected.updated_at + "." })
     );
     head.appendChild(metaTable(selected));
     head.appendChild(ramp(selected));
     head.appendChild(issues(selected));
     head.appendChild(sources(selected));
-    head.appendChild(el("h3", { text: "Tile backend preview address" }));
-    head.appendChild(el("p", { text: result.preview.reason }));
-    if (result.preview.tile_backend) {
-      head.appendChild(el("p", { className: "note", text: result.preview.tile_backend.integration_status + ". " + result.preview.tile_backend.note }));
-    }
+    const tile = el("details", {}, el("summary", { text: "Tile address" }));
+    tile.appendChild(el("p", { className: "note", text: result.preview.reason }));
     if (result.preview.template) {
-      head.appendChild(el("p", { className: "tag", text: result.preview.template }));
-      head.appendChild(el("p", { className: "note", text: "Shown as text only. The admin token is not sent to the tile backend, and publishing does not generate tiles." }));
+      tile.appendChild(el("p", { className: "tag", text: result.preview.template }));
+      tile.appendChild(el("p", { className: "note", text: "Shown as text only. The admin token is not sent to the tile backend." }));
     }
+    head.appendChild(tile);
     if (actor && actor.role === "layer-admin") {
       head.appendChild(editForm(selected));
       if (selected.status === "draft") head.appendChild(publishForm(selected));
@@ -314,11 +350,11 @@
       ["Nodata min / max", formatPair(layer.nodata.min_value, layer.nodata.max_value)],
       ["Fill nodata / raster", formatPair(layer.nodata.fill_nodata, layer.nodata.raster_nodata)]
     ];
-    const table = el("table");
+    const list = el("dl", { className: "facts" });
     rows.forEach(function (row) {
-      table.appendChild(el("tr", {}, el("th", { scope: "row", text: row[0] }), el("td", { text: row[1] })));
+      list.appendChild(el("div", {}, el("dt", { text: row[0] }), el("dd", { text: row[1] })));
     });
-    return el("div", {}, el("h3", { text: "Pyramid, COG, bounds, nodata" }), table);
+    return list;
   }
 
   function formatPair(a, b) {
@@ -415,7 +451,7 @@
   }
 
   function exportForm(tag) {
-    const box = el("div", {}, el("h3", { text: "Legacy export" }));
+    const box = el("details", {}, el("summary", { text: "Legacy export" }));
     box.appendChild(el("p", { className: "note", text: "Export returns setting.ini JSON and color.txt in the page. It does not write the tile repository." }));
     const out = el("textarea", { id: "legacy-export", readonly: "readonly" });
     const button = el("button", { type: "button", text: "Show legacy export" });
@@ -435,7 +471,7 @@
 
   async function auditBlock(tag) {
     const result = await api("GET", "/v1/layers/audit?tag=" + encodeURIComponent(tag));
-    const box = el("div", {}, el("h3", { text: "Audit trail" }));
+    const box = el("details", {}, el("summary", { text: "Audit trail" }));
     if (!result.audit.length) {
       box.appendChild(el("p", { text: "No audit events." }));
       return box;
@@ -450,6 +486,7 @@
 
   function renderRegister() {
     main.textContent = "";
+    setChrome("Register", "A draft is stored only after confirmation.", "layers");
     const form = el("form", { className: "panel" },
       el("h2", { text: "Register a layer" }),
       el("p", { className: "note", text: "Preview validates metadata and does not save it. Create stores a draft. Neither step generates tiles." })
@@ -540,6 +577,7 @@
 
   function renderImport() {
     main.textContent = "";
+    setChrome("Import", "Legacy text becomes a registry draft. Tile files are not written.", "layers");
     const form = el("form", { className: "panel" },
       el("h2", { text: "Import legacy metadata" }),
       el("p", { className: "note", text: "Paste setting.ini JSON and color.txt. Import creates a draft in this registry and does not write the tile repository. Existing tags are refused." })
@@ -583,12 +621,19 @@
   }
 
   async function bootSession() {
+    if (!signedIn()) {
+      actor = null;
+      statusNote = "";
+      setNotice("");
+      render();
+      return;
+    }
     try {
       const result = await api("GET", "/v1/session");
       actor = result.actor;
       const tileNote = result.tile_backend && result.tile_backend.note ? " " + result.tile_backend.note : "";
       statusNote = result.effects_notice + tileNote;
-      document.getElementById("fixture-banner").textContent = result.banner + " " + statusNote;
+      setNotice(result.banner);
       say(result.banner);
       render();
     } catch (error) {
